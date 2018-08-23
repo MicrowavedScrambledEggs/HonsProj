@@ -33,6 +33,7 @@ nontargets <- full_gene_list[!row.names(full_gene_list)
 # Get genbank accession numbers
 genbankTargetAcc <- featDatTable$`GenBank Accession`[featDatTable$ID 
                                                %in% row.names(targets)]
+genbankTargetAcc <- genbankTargetAcc[genbankTargetAcc != ""]
 # Querry nucleotide
 # Parse the sequences out of the FASTA
 getmRNASequence <- function(accNo){
