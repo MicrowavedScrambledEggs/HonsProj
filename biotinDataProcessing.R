@@ -45,26 +45,38 @@ getmRNASequence <- function(accNo){
 }
 targetSequences <- cbind(genbankTargetAcc, sapply(genbankTargetAcc, 
                                                   getmRNASequence))
-targetRNASeq <- gsub("T", "U", targetSequences[,2])
-targetRNAStrings <- RNAStringSet(targetRNASeq)
+targetRNAStrings <- DNAStringSet(targetRNASeq)
 
-miR23b <- RNAString("AUCACAUUGCCAGGGAUUACC")
+miR23b <- DNAString(gsub("U", "T","AUCACAUUGCCAGGGAUUACC"))
 miR23b_revComp <- reverseComplement(miR23b)
 
-# Class5 search strings
+# Basic seed
 seq_6mer <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-6), 
                    end = (length(miR23b_revComp)-1))
 
-# Class1 and 3 search strings
-seq_7merm8 <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-7), 
-                     end = (length(miR23b_revComp)-1))
+# Preventing overlap in searches
+iden8 <- letter(miR23b_revComp, (length(miR23b_revComp)-7))
+iden1 <- letter(miR23b_revComp, (length(miR23b_revComp)))
+# The IUPAC letter for "every nucleotide type except one"
+notMatches <- c("V", "H", "D", "B")
+names(notMatches) <- c("T", "G", "C", "A")
+# The IUPAC letter for "every nucleotide type except A and one other"
+notMatchNotA <- c("S", "Y", "K", "B")
+names(notMatchNotA) <- c("T", "G", "C", "A")
+notMatch8 <- notMatches[iden8]
+notMatch1 <- notMatches[iden1]
+notMorA1 <- notMatchNotA[iden1]
+
+# Class1 search strings
+seq_7merm8 <- xscat(subseq(miR23b_revComp, start = (length(miR23b_revComp)-7), 
+                     end = (length(miR23b_revComp)-1)), notMatch1)
 seq_8mer <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-7), 
                    end = length(miR23b_revComp))
-seq_7merA1 <- xscat(subseq(miR23b_revComp, start = (length(miR23b_revComp)-6), 
+seq_7merA1 <- xscat(notMatch8, subseq(miR23b_revComp, start = (length(miR23b_revComp)-6), 
                      end = (length(miR23b_revComp)-1)), "A")
-class1Search <- RNAStringSet(list(seq_8mer, seq_7merm8, seq_7merA1))
+class1Search <- DNAStringSet(list(seq_8mer, seq_7merm8, seq_7merA1))
 
-# Class 2 and 4 search strings
+# Class 2 search strings
 guWob_seqs <- function(seq){
   output <- c()
   seqQ <- queue()
@@ -75,7 +87,7 @@ guWob_seqs <- function(seq){
     startPos <- sTup[[2]]
     for(i in c(startPos:length(sCurrent))){
       if(letter(sCurrent, i) == "C"){
-        snew <- replaceAt(sCurrent, IRanges(i,i), "U")
+        snew <- replaceAt(sCurrent, IRanges(i,i), "T")
         if(i < length(sCurrent)) pushback(seqQ, list(snew, i+1))
         output <- c(output, snew)
       }
@@ -86,14 +98,30 @@ guWob_seqs <- function(seq){
       }
     }
   }
-  return(RNAStringSet(output))
+  return(DNAStringSet(output))
 }
 c2GU <- guWob_seqs(seq_6mer)
-c2GU7merm8 <- xscat(letter(miR23b_revComp, length(miR23b_revComp)-7), c2GU)
+c2GU7merm8 <- xscat(letter(miR23b_revComp, length(miR23b_revComp)-7), c2GU, 
+                    notMatch1)
 c2GU8mer <- xscat(letter(miR23b_revComp, length(miR23b_revComp)-7), c2GU,
                   letter(miR23b_revComp, length(miR23b_revComp)))
-c2GU7merA1 <- xscat(c2GU, "A")
-c2Full <- RNAStringSet(c(c2GU7merA1, c2GU7merm8, c2GU8mer))
+c2GU7merA1 <- xscat(notMatch8, c2GU, "A")
+c2Full <- DNAStringSet(list(c2GU7merA1, c2GU7merm8, c2GU8mer))
+
+# class 3 search strings
+misMatchNotGU <- function(seq, start = 1, end = length(seq)){
+  output <- c()
+  mismatchMap <- c("Y", "R", "H", "V")
+  names(mismatchMap) <- c("A", "C", "G", "T")
+  for(i in start:end){
+    snew <- replaceAt(seq, IRanges(i,i), mismatchMap[letter(seq, i)])
+    output <- c(output, snew)
+  }
+  return(DNAStringSet(output))
+}
+
+# class 5 search string
+class5Search <- xscat(notMatch8, seq_6mer, notMorA1)
 
 # class 6 and 8 search strings
 cent3 <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-12), 
@@ -102,33 +130,44 @@ cent4 <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-13),
                 end = (length(miR23b_revComp)-3))
 cent5 <- subseq(miR23b_revComp, start = (length(miR23b_revComp)-14), 
                 end = (length(miR23b_revComp)-4))
-class6Search <- RNAStringSet(c(cent3, cent4, cent5))
+class6Search <- DNAStringSet(list(cent3, cent4, cent5))
 
 # class 7 and 9 search strings
 GUcent3 <- guWob_seqs(cent3)
 GUcent4 <- guWob_seqs(cent4)
 GUcent5 <- guWob_seqs(cent5)
-class7Search <- RNAStringSet(c(GUcent3, GUcent4, GUcent5))
+class7Search <- DNAStringSet(c(GUcent3, GUcent4, GUcent5))
 
-# TO:DO sort out overlaping matches in the same class
-
-class1_counts <- sapply(class1Search, vcountPattern, subject = targetRNAStrings)
-class2_counts <- sapply(c2Full, vcountPattern, subject = targetRNAStrings)
+class1_counts <- sapply(class1Search, vcountPattern, subject = targetRNAStrings,
+                        fixed = "subject")
+class1_count <- rowSums(class1_counts)
+class2_counts <- sapply(c2Full, vcountPattern, subject = targetRNAStrings,
+                        fixed = "subject")
+class2_count <- rowSums(class2_counts)
 class3_counts <- sapply(class1Search, vcountPattern, subject = targetRNAStrings,
-                        min.mismatch = 1, max.mismatch = 1)
+                        min.mismatch = 1, max.mismatch = 1, fixed = "subject")
+class3_count <- rowSums(class3_counts)
 class4_counts <- sapply(c2Full, vcountPattern, subject = targetRNAStrings,
-                        min.mismatch = 1, max.mismatch = 1)
-class5_counts <- vcountPattern(seq_6mer, targetRNAStrings)
-class6_counts <- sapply(class6Search, vcountPattern, subject = targetRNAStrings)
-class7_counts <- sapply(class7Search, vcountPattern, subject = targetRNAStrings)
+                        min.mismatch = 1, max.mismatch = 1, fixed = "subject")
+class4_count <- rowSums(class4_counts)
+class5_counts <- vcountPattern(class5Search, targetRNAStrings, fixed = "subject")
+class6_counts <- sapply(class6Search, vcountPattern, subject = targetRNAStrings,
+                        fixed = "subject")
+class6_count <- rowSums(class6_counts)
+class7_counts <- sapply(class7Search, vcountPattern, subject = targetRNAStrings,
+                        fixed = "subject")
+class7_count <- rowSums(class7_counts)
 class8_counts <- sapply(class6Search, vcountPattern, subject = targetRNAStrings,
-                        min.mismatch = 1, max.mismatch = 1)
+                        min.mismatch = 1, max.mismatch = 1, fixed = "subject")
+class8_count <- rowSums(class8_counts)
 class9_counts <- sapply(class7Search, vcountPattern, subject = targetRNAStrings,
-                        min.mismatch = 1, max.mismatch = 1)
-siteCountMat <- cbind(class1_counts, class2_counts, class3_counts, class4_counts,
-                      class5_counts, class6_counts, class7_counts, class8_counts, 
-                      class9_counts)
+                        min.mismatch = 1, max.mismatch = 1, fixed = "subject")
+class9_count <- rowSums(class9_counts)
+siteCountMat <- cbind(class1_count, class2_count, class3_count, class4_count,
+                      class5_counts, class6_count, class7_count, class8_count, 
+                      class9_count)
 
+totalSites <- rowSums(siteCountMat)
 
 
 
