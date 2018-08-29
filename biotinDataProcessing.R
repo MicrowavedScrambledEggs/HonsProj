@@ -49,7 +49,7 @@ targetSequences <- cbind(genbankTargetAcc, sapply(genbankTargetAcc,
 # Converted to DNAString to match the mRNA sequence type
 # Also because i don't know if wildcard nucleotides work when 
 # using matchPattern with RNAString
-targetRNAStrings <- DNAStringSet(targetRNASeq)
+targetRNAStrings <- DNAStringSet(targetSequences[,2])
 miR23b <- DNAString(gsub("U", "T","AUCACAUUGCCAGGGAUUACC"))
 miR23b_revComp <- reverseComplement(miR23b)
 
@@ -119,7 +119,7 @@ c2GU7merm8 <- xscat(letter(miR23b_revComp, length(miR23b_revComp)-7), c2GU,
 c2GU8mer <- xscat(letter(miR23b_revComp, length(miR23b_revComp)-7), c2GU,
                   letter(miR23b_revComp, length(miR23b_revComp)))
 c2GU7merA1 <- xscat(notMatch8, c2GU, "A")
-c2Full <- DNAStringSet(list(c2GU7merA1, c2GU7merm8, c2GU8mer))
+c2Full <- DNAStringSet(c(c2GU7merA1, c2GU7merm8, c2GU8mer))
 
 # class 3 search strings
 
@@ -247,5 +247,47 @@ siteCountMat <- cbind(class1_count, class2_count, class3_count, class4_count,
 
 totalSites <- rowSums(siteCountMat)
 
+class1Matches <- sapply(class1Search, vmatchPattern, subject = targetRNAStrings,
+                        fixed = "subject")
+class1Ends <- sapply(class1Matches, endIndex)
 
 
+
+sitesOfClass <- function(classSearch, rnaSet) {
+  if(class(classSearch) != "DNAStringSet"){
+    classSearch <- DNAStringSet(classSearch) # allows inputting a single DNAString
+  }
+  classMatches <- sapply(classSearch, vmatchPattern, subject = rnaSet,
+                         fixed = "subject")
+  classEnds <- sapply(classMatches, endIndex)
+  allClassEnds <- vector('list', length(rnaSet))
+  meanDistFrom3 <- vector('numeric', length(rnaSet))
+  varDistFrom3 <- vector('numeric', length(rnaSet))
+  medianDistFrom3 <- vector('numeric', length(rnaSet))
+  
+  for(i in 1:length(rnaSet)){
+    classEnd <- c()
+    for(j in 1:length(classMatches)){
+      if(!is.null(classEnds[[i, j]])) classEnd <- c(classEnd, classEnds[[i, j]])
+    }
+    allClassEnds[[i]] <- classEnd
+    if(length(classEnd) > 0) {
+      distFrom3 <- length(rnaSet[[i]]) - classEnd
+      meanDistFrom3[i] <- mean(distFrom3)
+      varDistFrom3[i] <- var(distFrom3)
+      medianDistFrom3[i] <- median(distFrom3)
+    }
+  }
+  output <- list(allClassEnds, meanDistFrom3, varDistFrom3, medianDistFrom3)
+  names(output) <- c("site ending positions", "Mean Distance from 3' end", 
+                     "Variance of Distance from 3' end", "Median Distance from 3' end")
+  return(output)
+}
+
+
+
+distFromStop <- list()
+meanDistFromStop <- c()
+varDistFromStop <- c()
+medianDistFromStop <- c()
+siteRegion <- list()
