@@ -36,6 +36,8 @@ nontargets <- full_gene_list[!row.names(full_gene_list)
 genbankTargetAcc <- featDatTable$`GenBank Accession`[featDatTable$ID 
                                                %in% row.names(targets)]
 genbankTargetAcc <- genbankTargetAcc[genbankTargetAcc != ""]
+genbankTargetAcc <- unique(genbankTargetAcc)
+
 # Querry nucleotide
 # Parse the sequences out of the FASTA
 getmRNASequence <- function(accNo){
@@ -264,27 +266,40 @@ sitesOfClass <- function(classSearch, rnaSet) {
   meanDistFrom3 <- vector('numeric', length(rnaSet))
   varDistFrom3 <- vector('numeric', length(rnaSet))
   medianDistFrom3 <- vector('numeric', length(rnaSet))
-  
   for(i in 1:length(rnaSet)){
     classEnd <- c()
     for(j in 1:length(classMatches)){
       if(!is.null(classEnds[[i, j]])) classEnd <- c(classEnd, classEnds[[i, j]])
     }
-    allClassEnds[[i]] <- classEnd
     if(length(classEnd) > 0) {
+      allClassEnds[[i]] <- classEnd
       distFrom3 <- length(rnaSet[[i]]) - classEnd
       meanDistFrom3[i] <- mean(distFrom3)
       varDistFrom3[i] <- var(distFrom3)
       medianDistFrom3[i] <- median(distFrom3)
+    } else {
+      meanDistFrom3[i] <- NaN
+      varDistFrom3[i] <- NaN
+      medianDistFrom3[i] <- NaN
     }
   }
   output <- list(allClassEnds, meanDistFrom3, varDistFrom3, medianDistFrom3)
   names(output) <- c("site ending positions", "Mean Distance from 3' end", 
-                     "Variance of Distance from 3' end", "Median Distance from 3' end")
+                     "Variance of Distance from 3' end", 
+                     "Median Distance from 3' end")
   return(output)
 }
 
+# Getting annotations so as to find start and stop codons
+aliases <- read.table("aliases.txt", header = TRUE, sep = '\t', quote = '"', 
+                      comment.char = "%")
+annotations <- read.table("annotations.BED", header = FALSE, sep = '\t')
+colnames(annotations) <- c("chrom", "chromStart", "chromEnd", "name", 
+                           "score", "strand", "thickStart", "thickEnd",
+                           "itemRgb", "blockCount", "blockSizes", 
+                           "blockStarts")
 
+targetNames <- aliases[aliases[,2] %in% genbankTargetAcc, ]
 
 distFromStop <- list()
 meanDistFromStop <- c()
