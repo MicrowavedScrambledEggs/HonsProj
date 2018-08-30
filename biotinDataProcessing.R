@@ -294,6 +294,13 @@ colnames(annotations) <- c("chrom", "chromStart", "chromEnd", "name",
                            "blockStarts")
 
 targetNames <- aliases[aliases[,2] %in% genbankTargetAcc, ]
+targetAnnot <- annotations[annotations$name %in% targetNames[,1], ]
+colnames(targetNames) <- c("name", "genBankAcc")
+targetAnnot <- merge(targetAnnot, targetNames, by = "name")
+
+# How do I deal with multiple annotations for the same mRNA??
+multipleAnot <- targetAnnot[targetAnnot$genBankAcc %in% 
+                              names(which(table(targetAnnot$genBankAcc) > 1)), ]
 
 distFromStop <- list()
 meanDistFromStop <- c()
