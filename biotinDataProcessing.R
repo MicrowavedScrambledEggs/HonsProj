@@ -249,12 +249,6 @@ siteCountMat <- cbind(class1_count, class2_count, class3_count, class4_count,
 
 totalSites <- rowSums(siteCountMat)
 
-class1Matches <- sapply(class1Search, vmatchPattern, subject = targetRNAStrings,
-                        fixed = "subject")
-class1Ends <- sapply(class1Matches, endIndex)
-
-
-
 sitesOfClass <- function(classSearch, rnaSet) {
   if(class(classSearch) != "DNAStringSet"){
     classSearch <- DNAStringSet(classSearch) # allows inputting a single DNAString
