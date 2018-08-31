@@ -40,13 +40,21 @@ genbankTargetAcc <- unique(genbankTargetAcc)
 
 # Querry nucleotide
 # Parse the sequences out of the FASTA
+# Parse the codon start and stop out of the feature table
 getmRNASequence <- function(accNo){
   fasta <- entrez_fetch("nucleotide", id=accNo, rettype = "fasta")
   seqLines <- unlist(strsplit(fasta, "\n"))
-  return(paste0(seqLines[2:(length(seqLines)-1)], collapse = ""))
+  seqString <- paste0(seqLines[2:(length(seqLines)-1)], collapse = "")
+  featTable <- entrez_fetch("nucleotide", id=accNo, rettype = "ft")
+  cdsStartStop <- regmatches(featTable, regexpr("\\d+\\t\\d+\\tCDS", featTable))
+  cdsStartStop <- unlist(strsplit(cdsStartStop, "\t"))
+  cdsStart <- as.integer(cdsStartStop[1])
+  cdsStop <- as.integer(cdsStartStop[2])
+  output <- list(accNo, seqString, cdsStart, cdsStop)
+  names(output) <- c("GenBank Accession", "Full Sequence", "CDS Start", "CDS Stop")
+  return(output)
 }
-targetSequences <- cbind(genbankTargetAcc, sapply(genbankTargetAcc, 
-                                                  getmRNASequence))
+targetSequences <- t(as.data.frame(sapply(genbankTargetAcc, getmRNASequence)))
 
 # Converted to DNAString to match the mRNA sequence type
 # Also because i don't know if wildcard nucleotides work when 
@@ -249,61 +257,112 @@ siteCountMat <- cbind(class1_count, class2_count, class3_count, class4_count,
 
 totalSites <- rowSums(siteCountMat)
 
-sitesOfClass <- function(classSearch, rnaSet) {
+sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS) {
   if(class(classSearch) != "DNAStringSet"){
     classSearch <- DNAStringSet(classSearch) # allows inputting a single DNAString
   }
   classMatches <- sapply(classSearch, vmatchPattern, subject = rnaSet,
                          fixed = "subject")
   classEnds <- sapply(classMatches, endIndex)
+  classCounts <- sapply(classMatches, elementNROWS)
   allClassEnds <- vector('list', length(rnaSet))
+  allClassCounts <- vector('numeric', length(rnaSet))
   meanDistFrom3 <- vector('numeric', length(rnaSet))
   varDistFrom3 <- vector('numeric', length(rnaSet))
   medianDistFrom3 <- vector('numeric', length(rnaSet))
+  meanDistFromStop <- vector('numeric', length(rnaSet))
+  varDistFromStop <- vector('numeric', length(rnaSet))
+  medianDistFromStop <- vector('numeric', length(rnaSet))
+  freqIn3 <- vector('numeric', length(rnaSet))
+  freqInCDS <- vector('numeric', length(rnaSet))
+  freqIn5 <- vector('numeric', length(rnaSet))
+  aCounts <- matrix(nrow = length(rnaSet), ncol = 47)
+  cCounts <- matrix(nrow = length(rnaSet), ncol = 47)
+  gCounts <- matrix(nrow = length(rnaSet), ncol = 47)
+  tCounts <- matrix(nrow = length(rnaSet), ncol = 47)
   for(i in 1:length(rnaSet)){
     classEnd <- c()
+    classCount <- 0
     for(j in 1:length(classMatches)){
       if(!is.null(classEnds[[i, j]])) classEnd <- c(classEnd, classEnds[[i, j]])
+      classCount <- classCount + classCounts[i,j]
     }
-    if(length(classEnd) > 0) {
+    if(classCount > 0) {
+      cdsStart <- rnaCDS$`CDS Start`[[i]]
+      cdsStop <- rnaCDS$`CDS Stop`[[i]]
+      allClassCounts[i] <- classCount
       allClassEnds[[i]] <- classEnd
       distFrom3 <- length(rnaSet[[i]]) - classEnd
       meanDistFrom3[i] <- mean(distFrom3)
       varDistFrom3[i] <- var(distFrom3)
       medianDistFrom3[i] <- median(distFrom3)
+      if(length(cdsStop) > 0){
+        distFromStop <- cdsStop - classEnd
+        meanDistFromStop[i] <- mean(distFromStop)
+        varDistFromStop[i] <- var(distFromStop)
+        medianDistFromStop[i] <- median(distFromStop)
+        freqIn5[i] <- length(which(classEnd < cdsStart)) / length(classEnd)
+        freqInCDS[i] <- length(which(classEnd >= cdsStart 
+                                  & classEnd <= cdsStop)) / length(classEnd)
+        freqIn3[i] <- length(which(classEnd > cdsStop)) / length(classEnd)
+      } else { # Non coding RNA
+        meanDistFromStop[i] <- NA
+        varDistFromStop[i] <- NA
+        medianDistFromStop[i] <- NA
+        freqIn5[i] <- NA
+        freqInCDS[i] <- NA
+        freqIn3[i] <- NA
+      }
     } else {
       meanDistFrom3[i] <- NaN
       varDistFrom3[i] <- NaN
       medianDistFrom3[i] <- NaN
+      meanDistFromStop[i] <- NaN
+      varDistFromStop[i] <- NaN
+      medianDistFromStop[i] <- NaN
+      freqIn5[i] <- NaN
+      freqInCDS[i] <- NaN
+      freqIn3[i] <- NaN
     }
   }
-  output <- list(allClassEnds, meanDistFrom3, varDistFrom3, medianDistFrom3)
-  names(output) <- c("site ending positions", "Mean Distance from 3' end", 
-                     "Variance of Distance from 3' end", 
-                     "Median Distance from 3' end")
-  return(output)
+  outputDF <- as.data.frame(
+    cbind(allClassCounts, meanDistFrom3, medianDistFrom3, varDistFrom3,
+          meanDistFromStop, medianDistFromStop, varDistFromStop, freqIn5, 
+          freqInCDS, freqIn3))
+  colnames(outputDF) <- c(paste0("n", nameOfClass), paste0(nameOfClass, "_",
+                          c("end3'distMean", "end3'distMedian", "end3'distVar", 
+                            "stopdistMean", "stopdistMedian", "stopdistVar", 
+                            "5'UTRFreq", "CDSFreq", "3'UTRFreq")))
+  return(list(allClassEnds, outputDF))
 }
 
-# Getting annotations so as to find start and stop codons
-aliases <- read.table("aliases.txt", header = TRUE, sep = '\t', quote = '"', 
-                      comment.char = "%")
-annotations <- read.table("annotations.BED", header = FALSE, sep = '\t')
-colnames(annotations) <- c("chrom", "chromStart", "chromEnd", "name", 
-                           "score", "strand", "thickStart", "thickEnd",
-                           "itemRgb", "blockCount", "blockSizes", 
-                           "blockStarts")
+targetSitesClass1 <- sitesOfClass(class1Search, "c1", targetRNAStrings, targetSequences) 
+targetSitesClass2 <- sitesOfClass(c2Full, "c2", targetRNAStrings, targetSequences) 
+targetSitesClass3 <- sitesOfClass(class3search, "c3", targetRNAStrings, targetSequences) 
+targetSitesClass4 <- sitesOfClass(class4search, "c4", targetRNAStrings, targetSequences) 
+targetSitesClass5 <- sitesOfClass(class5Search, "c5", targetRNAStrings, targetSequences) 
+targetSitesClass6 <- sitesOfClass(class6Search, "c6", targetRNAStrings, targetSequences) 
+targetSitesClass7 <- sitesOfClass(class7Search, "c7", targetRNAStrings, targetSequences) 
+targetSitesClass8 <- sitesOfClass(class8Search, "c8", targetRNAStrings, targetSequences) 
+targetSitesClass9 <- sitesOfClass(class9Search, "c9", targetRNAStrings, targetSequences) 
 
-targetNames <- aliases[aliases[,2] %in% genbankTargetAcc, ]
-targetAnnot <- annotations[annotations$name %in% targetNames[,1], ]
-colnames(targetNames) <- c("name", "genBankAcc")
-targetAnnot <- merge(targetAnnot, targetNames, by = "name")
+nucFreqAtSites <- function(classSiteEnds, nameOfClass, targetRNAStrings)
+{
+  siteIndex <- seq(36, -10, -1)
+  siteIndex <- siteIndex[siteIndex != 0]
+  nucFreqMat <- matrix(NaN, nrow = length(classSiteEnds), ncol = 46*4)
+  for(i in 1:length(classSiteEnds)) {
+    siteAreaSeqs <- DNAStringSet(sapply(
+      classSiteEnds[[i]], function(x) 
+        subseq(targetRNAStrings[[i]], start = x - 35, end = x + 10)))
+    nucFreqs <- c(sapply(1:46, function(x) 
+      nucleotideFrequencyAt(siteAreaSeqs, c(x), as.prob = TRUE)))
+    nucFreqMat[i,] <- nucFreqs
+  }
+  colnames(nucFreqMat) <- c(sapply(
+    siteIndex, function(x) 
+      paste0(nameOfClass, "_freq", c("A", "C", "G", "T"), x)))
+  return(nucFreqMat)
+}
 
-# How do I deal with multiple annotations for the same mRNA??
-multipleAnot <- targetAnnot[targetAnnot$genBankAcc %in% 
-                              names(which(table(targetAnnot$genBankAcc) > 1)), ]
-
-distFromStop <- list()
-meanDistFromStop <- c()
-varDistFromStop <- c()
-medianDistFromStop <- c()
-siteRegion <- list()
+nucFreqSitesClass1 <- nucFreqAtSites(targetSitesClass1[[1]], "c1", targetRNAStrings) 

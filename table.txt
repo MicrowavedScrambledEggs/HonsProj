@@ -1,0 +1,31 @@
+>Feature ref|NM_021170.3|
+1	962	gene
+			gene	HES4
+			gene_syn	bHLHb42
+			gene_desc	hes family bHLH transcription factor 4
+			db_xref	GeneID:57801
+			db_xref	HGNC:HGNC:24149
+			db_xref	MIM:608060
+1	307	exon
+			inference	alignment:Splign:2.1.0
+101	103	misc_feature
+			note	upstream in-frame stop codon
+200	865	CDS
+			product	transcription factor HES-4 isoform 2
+			product	bHLH factor Hes4
+			product	transcription factor HES-4
+			product	hHES4
+			product	class B basic helix-loop-helix protein 42
+			product	hairy and enhancer of split 4
+			protein_id	ref|NP_066993.1|
+			note	isoform 2 is encoded by transcript variant 2
+			db_xref	CCDS:CCDS5.1
+308	403	exon
+			inference	alignment:Splign:2.1.0
+404	491	exon
+			inference	alignment:Splign:2.1.0
+492	962	exon
+			inference	alignment:Splign:2.1.0
+962	962	polyA_site
+
+
