@@ -1,6 +1,6 @@
 library(GEOquery)
 library(limma)
-
+source("CreateFeatureMatrix.R")
 
 cloonan23b27a <- getGEO("GSE40410", GSEMatrix =TRUE, AnnotGPL=TRUE)
 #comes up with a "13 parsing failures" warning
@@ -8,6 +8,7 @@ featDat <- featureData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 featDatTable <- fData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 assayDat <- assayData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 
+miR23b <- "AUCACAUUGCCAGGGAUUACC"
 # Volcano plot for miR-23b. Feeling like a script kidde here
 layout <- c("pulldown", "control", "pulldown", "control")
 design<-model.matrix(~0+layout)
@@ -21,7 +22,7 @@ full_gene_list<-topTable(fit2, coef=1, number=1000000, sort.by="logFC")
 plot(full_gene_list$logFC, -log10(full_gene_list$P.Value), 
      xlab="log2 fold change", ylab="-log10 p-value")
 
-# miR-23b targets defined as below log2FoldChange threshold -0.6 and 
+# miR-23b targets defined as below log2FoldChange threshold -1 and 
 # above -log10pValue threshold of -log10(0.05) 
 # Maybe need a better reason for these thresholds other than 
 # "because that's what other bpd studies used"
@@ -32,9 +33,14 @@ nontargets <- full_gene_list[!row.names(full_gene_list)
                              %in% row.names(targets), ]
 # Get genbank accession numbers
 genbankAcc <- featDatTable$`GenBank Accession`
-# TODO: Make collumn for if target or not
+# Create a column for 1 being target and 0 being non target
+targetCol <- rep(0, nrow(full_gene_list))
+targetCol[row.names(full_gene_list) %in% row.names(targets)] <- 1
 
-genbankTargetAcc <- genbankTargetAcc[genbankTargetAcc != ""]
-genbankTargetAcc <- unique(genbankTargetAcc)
+accToTarget <- cbind(genbankAcc, targetCol)
+# Removing repeats and RNA with no acc numbers
+accToTarget <- accToTarget[accToTarget[,1] != "", ]
+accToTarget <- unique(accToTarget)
 
+mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget[,1], accToTarget[,2])
 

@@ -2,21 +2,48 @@ library(rentrez)
 library(Biostrings)
 library(dequer)
 
+# Size of window around position of end of sites in which to measure 
+# nucleotide frequencies at each position
+dwnStrm <- 35
+upStrm <- 10
+nucWin <- dwnStrm + upStrm + 1
 
-getmRNASequence <- function(accNo){
+
+querymRNASequence <- function(accNos){
   # Querry nucleotide
   # Parse the sequences out of the FASTA
-  # Parse the codon start and stop out of the feature table
-  fasta <- entrez_fetch("nucleotide", id=accNo, rettype = "fasta")
-  seqLines <- unlist(strsplit(fasta, "\n"))
-  seqString <- paste0(seqLines[2:(length(seqLines)-1)], collapse = "")
-  featTable <- entrez_fetch("nucleotide", id=accNo, rettype = "ft")
-  cdsStartStop <- regmatches(featTable, regexpr("\\d+\\t\\d+\\tCDS", featTable))
-  cdsStartStop <- unlist(strsplit(cdsStartStop, "\t"))
-  cdsStart <- as.integer(cdsStartStop[1])
-  cdsStop <- as.integer(cdsStartStop[2])
-  output <- list(accNo, seqString, cdsStart, cdsStop)
-  names(output) <- c("GenBank Accession", "Full Sequence", "CDS Start", "CDS Stop")
+  # Parse the codon start and stop out of the feature tables
+  
+  output <- as.data.frame(matrix(nrow = 0, ncol = 4))
+  colnames(output) <- c("GenBank Accession", "Full Sequence", "CDS Start",
+                        "CDS Stop")
+  
+  # Because we're usually dealling with 1e4 to 1.5e4 RNAs we need split
+  # the request into chunks
+  chunkSize = 100
+  for(i in seq(1, length(accNos), chunkSize))
+  {
+    accChunk <- accNos[i:min(i+chunkSize-1, length(accNos))]
+    fasta <- entrez_fetch("nucleotide", id=accChunk, rettype = "fasta")
+    seqFastas <- strsplit(fasta, "\n\n")[[1]]
+    seqFastaList <- strsplit(seqFastas, "\n")
+    seqsStrings <- sapply(seqFastaList, function(x) 
+      paste0(x[2:length(x)], collapse = ""))
+    featTabs <- entrez_fetch("nucleotide", id=accChunk, rettype = "ft")
+    featTabsList <- strsplit(featTabs, "\n\n")[[1]]
+    hasCDS <- regexpr("\\d+\\t\\d+\\tCDS", featTabsList)
+    cdsStartStops <- regmatches(featTabsList, hasCDS)
+    cdsList <- strsplit(cdsStartStops, "\t")
+    cdsStarts <- sapply(cdsList, function(x) as.integer(x[1]))
+    cdsStops <- sapply(cdsList, function(x) as.integer(x[2]))
+    chunk <- as.data.frame(cbind(accChunk, seqsStrings))
+    colnames(chunk) <- c("GenBank Accession", "Full Sequence")
+    chunk$`CDS Start` <- rep(NaN, length(accChunk))
+    chunk$`CDS Start`[hasCDS != -1] <- cdsStarts
+    chunk$`CDS Stop` <- rep(NaN, length(accChunk))
+    chunk$`CDS Stop`[hasCDS != -1] <- cdsStops
+    output <- rbind(output, chunk)
+  }
   return(output)
 }
 
@@ -107,9 +134,45 @@ misMatchNotGU <- function(seq, start = 1, end = NULL, reference = NULL){
 }
 
 
+nucFreqAroundSites <- function(dnastring, siteEnds)
+{
+  # Measure the frequency of nucleotides at each position in windows
+  # centered on the sites 
+  
+  # Get the sequence for each window 
+  siteAreaSeqs <- DNAStringSet(sapply(
+    siteEnds, function(x) 
+      subseq(dnastring, start = max(x - dwnStrm, 1), 
+             end = min(x + upStrm, length(dnastring)))))
+  
+  # Because sites may be at the ends of the mRNA, so the windows may
+  # extend beyond the bounds of the mRNA sequence. This means sites might
+  # vary in length. Therefore we have to pad out window sequences such 
+  # that the index of the position opposite miRNA position 1 is the same
+  # accross all window sequences
+  siteMat <- as.data.frame(
+    cbind(sapply(siteAreaSeqs, as.character), siteEnds))
+  siteMat$siteEnds <- siteEnds
+  siteMat$fiveOff <- 0 - (siteEnds - dwnStrm - 1)
+  siteMat$fiveOff[siteMat$fiveOff < 0] <- 0
+  siteMat$threeOff <- (siteEnds + upStrm) - nchar(dnastring)
+  siteMat$threeOff[siteMat$threeOff < 0] <- 0
+  shiftSeq <- apply(siteMat, 1, function(x) 
+    paste0(strrep("-", x[3]), x[1], strrep("-", x[4])))
+  shiftSeq <- DNAStringSet(shiftSeq)
+  
+  # Measure frequencies
+  nucFreqs <- c(sapply(1:nucWin, function(x) 
+    nucleotideFrequencyAt(shiftSeq, c(x))))
+  nucFreqs <- nucFreqs / length(siteEnds)
+  return(nucFreqs)
+}
+
+
 sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS, 
                          centeredClass = NULL) 
 {
+  # TODO: Document this disgustingly long method
   if(class(classSearch) != "DNAStringSet"){
     classSearch <- DNAStringSet(classSearch) # allows inputting a single DNAString
   }
@@ -136,9 +199,9 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
   }
   
   # for counting the nucleotide frequencies in and around the sites
-  siteIndex <- seq(36, -10, -1)
+  siteIndex <- seq(dwnStrm+1, -upStrm, -1)
   siteIndex <- siteIndex[siteIndex != 0]
-  nucFreqMat <- matrix(NaN, nrow = length(rnaSet), ncol = 46*4)
+  nucFreqMat <- matrix(NaN, nrow = length(rnaSet), ncol = nucWin*4)
   
   for(i in 1:length(rnaSet)){
     classEnd <- c()
@@ -157,14 +220,9 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
       varDistFrom3[i] <- var(distFrom3)
       medianDistFrom3[i] <- median(distFrom3)
       
-      siteAreaSeqs <- DNAStringSet(sapply(
-        classEnd, function(x) 
-          subseq(rnaSet[[i]], start = x - 35, end = x + 10)))
-      nucFreqs <- c(sapply(1:46, function(x) 
-        nucleotideFrequencyAt(siteAreaSeqs, c(x), as.prob = TRUE)))
-      nucFreqMat[i,] <- nucFreqs
+      nucFreqMat[i,] <- nucFreqAroundSites(rnaSet[[i]], classEnd)
       
-      if(length(cdsStop) > 0){
+      if(!is.nan(cdsStop)){
         distFromStop <- cdsStop - classEnd
         meanDistFromStop[i] <- mean(distFromStop)
         varDistFromStop[i] <- var(distFromStop)
@@ -183,9 +241,9 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
       }
       
       if(!is.null(centeredClass)){
-        freqStart3[i] <- classCounts[i, which(centeredClass == 3)] / classCount
-        freqStart4[i] <- classCounts[i, which(centeredClass == 4)] / classCount
-        freqStart5[i] <- classCounts[i, which(centeredClass == 5)] / classCount
+        freqStart3[i] <- sum(classCounts[i, which(centeredClass == 3)]) / classCount
+        freqStart4[i] <- sum(classCounts[i, which(centeredClass == 4)]) / classCount
+        freqStart5[i] <- sum(classCounts[i, which(centeredClass == 5)]) / classCount
       }
     } 
   }
@@ -198,10 +256,11 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
     cbind(allClassCounts, meanDistFrom3, medianDistFrom3, varDistFrom3,
           meanDistFromStop, medianDistFromStop, varDistFromStop, freqIn5, 
           freqInCDS, freqIn3))
-  colnames(outputDF) <- c(paste0("n", nameOfClass), paste0(nameOfClass, "_",
-                                                           c("end3'distMean", "end3'distMedian", "end3'distVar", 
-                                                             "stopdistMean", "stopdistMedian", "stopdistVar", 
-                                                             "5'UTRFreq", "CDSFreq", "3'UTRFreq")))
+  colnames(outputDF) <- c(
+    paste0("n", nameOfClass), 
+    paste0(nameOfClass, "_",c("end3'distMean", "end3'distMedian", "end3'distVar", 
+                              "stopdistMean", "stopdistMedian", "stopdistVar", 
+                              "5'UTRFreq", "CDSFreq", "3'UTRFreq")))
   outputDF <- cbind(outputDF, nucFreqMat)
   
   if(!is.null(centeredClass)){
@@ -213,14 +272,15 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
   return(list(allClassEnds, outputDF))
 }
 
-# TODO: Change to make target or not column optional
-trainAndTestFeatureMatrix <- function(miRNAString, accType)
+
+createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
 {
-  # Fills a feature matrix for training and testing the Random Forest
+  # Fills a feature matrix for either training and testing the classifier
+  # or for prediction by a trained classifier
   # miRNAString is the sequence of the mature microRNA
-  # accType is a two collumn data frame/matrix. 
-  #    - first col is the GenBank accession numbers for the RNA
-  #    - Second collumn indicates if it's a target or not
+  # acc is the GenBank accession numbers for the RNA
+  # targCol indicates which RNA are miRNA targets, which is needed for
+  # building a feature matrix for training and testing
   
   if(class(miRNAString) %in% c("DNAString", "RNAString")){
     miRNAString <- as.character(miRNAString)
@@ -244,7 +304,7 @@ trainAndTestFeatureMatrix <- function(miRNAString, accType)
   # Query Nucleotide using the accession numbers to get a data frame of
   # sequence strings and, for the mRNAs that are protein coding, the CDS
   # start and stop sites
-  seqAndCDS <- as.data.frame(t(sapply(accType[,1], getmRNASequence)))
+  seqAndCDS <- querymRNASequence(acc)
   mRNAStrings <- DNAStringSet(seqAndCDS$`Full Sequence`)
   
   # Create search strings for the different classes of sites
@@ -305,12 +365,14 @@ trainAndTestFeatureMatrix <- function(miRNAString, accType)
   class5Search <- xscat(notMatch8, seq_6mer, notMorA1)
   
   # class 6 search strings
-  cent3 <- subseq(miRNA_revComp, start = (length(miRNA_revComp)-12), 
-                  end = (length(miRNA_revComp)-2))
-  cent4 <- subseq(miRNA_revComp, start = (length(miRNA_revComp)-13), 
-                  end = (length(miRNA_revComp)-3))
-  cent5 <- subseq(miRNA_revComp, start = (length(miRNA_revComp)-14), 
-                  end = (length(miRNA_revComp)-4))
+  # Need to add N wild cards at the end so as site ends returned by search
+  # correspond to the position opposite site 1 on the miRNA
+  cent3 <- xscat(subseq(miRNA_revComp, start = (length(miRNA_revComp)-12), 
+                  end = (length(miRNA_revComp)-2)), "NN")
+  cent4 <- xscat(subseq(miRNA_revComp, start = (length(miRNA_revComp)-13), 
+                  end = (length(miRNA_revComp)-3)), "NNN")
+  cent5 <- xscat(subseq(miRNA_revComp, start = (length(miRNA_revComp)-14), 
+                  end = (length(miRNA_revComp)-4)), "NNNN")
   class6Search <- DNAStringSet(list(cent3, cent4, cent5))
   c6SearchCenStart <- c(3,4,5)
   
@@ -323,17 +385,17 @@ trainAndTestFeatureMatrix <- function(miRNAString, accType)
                         rep(5, length(GUcent5)))
   
   # class 8 search strings
-  mm_cent3 <- misMatchNotGU(cent3)
-  mm_cent4 <- misMatchNotGU(cent4)
-  mm_cent5 <- misMatchNotGU(cent5)
+  mm_cent3 <- misMatchNotGU(cent3, end = 11)
+  mm_cent4 <- misMatchNotGU(cent4, end = 11)
+  mm_cent5 <- misMatchNotGU(cent5, end = 11)
   class8Search <- DNAStringSet(c(mm_cent3, mm_cent4, mm_cent5))
   c8SearchCenStart <- c(rep(3, length(mm_cent3)),rep(4, length(mm_cent4)),
                         rep(5, length(mm_cent5)))
   
   # class 9 search strings
-  c9cent3 <- misMatchNotGU(GUcent3, reference = cent3)
-  c9cent4 <- misMatchNotGU(GUcent4, reference = cent4)
-  c9cent5 <- misMatchNotGU(GUcent5, reference = cent5)
+  c9cent3 <- misMatchNotGU(GUcent3, end = 11, reference = cent3)
+  c9cent4 <- misMatchNotGU(GUcent4, end = 11, reference = cent4)
+  c9cent5 <- misMatchNotGU(GUcent5, end = 11, reference = cent5)
   class9Search <- DNAStringSet(c(c9cent3, c9cent4, c9cent5))
   c9SearchCenStart <- c(rep(3, length(c9cent3)),rep(4, length(c9cent4)),
                         rep(5, length(c9cent5)))
@@ -364,17 +426,27 @@ trainAndTestFeatureMatrix <- function(miRNAString, accType)
   fullFeatTable$N <- rowSums(fullFeatTable[,paste0("nc", 1:9)])
   
   # Add collumns for identities of miRNA sequence
-  miNucIdenFeatsMat <- t(matrix(miNucIdenFeats, nrow = nrow(accType),
-                                ncol = length(miNucIdenFeats)))
-  colnames(miNucIdenFeats) <- paste0("m1", 1:26)
+  miNucIdenFeatsMat <- t(matrix(miNucIdenFeats, ncol = length(acc),
+                                nrow = length(miNucIdenFeats)))
+  colnames(miNucIdenFeatsMat) <- paste0("mi", 1:26)
   fullFeatTable <- cbind(fullFeatTable, miNucIdenFeatsMat)
   
   # Add collumns for length of miRNA and mRNA
   fullFeatTable$miLen <- miLen
-  fullFeatTable$mRNALen <- sapply(seqAndCDS$`Full Sequence`, nchar)
+  fullFeatTable$mRNALen <- sapply(
+    as.character(seqAndCDS$`Full Sequence`), nchar)
   
-  # So we can supervise learning
-  fullFeatTable$Target <- accType[,2]
+  if(!is.null(targCol)){
+    # So we can supervise learning
+    fullFeatTable$Target <- targCol
+    # Remove targets where no sites were found (should be rare)
+    beforeRemoval <- nrow(fullFeatTable[targCol == 1])
+    fullFeatTable <- fullFeatTable[!(targCol == 1 & fullFeatTable$N == 0), ]
+    afterRemoval <- nrow(fullFeatTable[fullFeatTable$target == 1])
+    numTargRemoved <- beforeRemoval - afterRemoval
+    print(paste("Removed", numTargRemoved, 
+                "targets with no binding sites found out of", beforeRemoval))
+  }
   
   return(fullFeatTable)
 }
