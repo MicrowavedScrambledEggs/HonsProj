@@ -457,5 +457,5 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
                 "targets with no binding sites found out of", beforeRemoval))
   }
   
-  return(list(siteEnds, fullFeatTable))
+  return(list(siteEnds, mRNAStrings, fullFeatTable))
 }
