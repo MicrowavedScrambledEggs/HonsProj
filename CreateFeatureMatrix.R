@@ -277,6 +277,7 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
 {
   # Fills a feature matrix for either training and testing the classifier
   # or for prediction by a trained classifier
+  # Also returns the 3' end of the positions of sites found on each mRNA
   # miRNAString is the sequence of the mature microRNA
   # acc is the GenBank accession numbers for the RNA
   # targCol indicates which RNA are miRNA targets, which is needed for
@@ -422,6 +423,14 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
                          sitesClass7[[2]], sitesClass8[[2]],
                          sitesClass9[[2]])
   
+  # Lists of position ends. Can be used for analysis or extracting extra
+  # features, etc
+  siteEnds <- list(sitesClass1[[1]], sitesClass2[[1]],
+                   sitesClass3[[1]], sitesClass4[[1]],
+                   sitesClass5[[1]], sitesClass6[[1]],
+                   sitesClass7[[1]], sitesClass8[[1]],
+                   sitesClass9[[1]])
+  
   # Add collumn for total sites found accross all classes
   fullFeatTable$N <- rowSums(fullFeatTable[,paste0("nc", 1:9)])
   
@@ -448,5 +457,5 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
                 "targets with no binding sites found out of", beforeRemoval))
   }
   
-  return(fullFeatTable)
+  return(list(siteEnds, fullFeatTable))
 }
