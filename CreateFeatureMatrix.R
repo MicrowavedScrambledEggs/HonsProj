@@ -474,17 +474,13 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
   featNames <- c(featNames, paste0(
     "dupFreeEng", c("Min", "Mean", "Median", "Var")))
   colnames(output) <- featNames
-  # for(i in 1:length(mRNAStrings)) {
-  for(i in 1:10) {
+  for(i in 1:length(mRNAStrings)) {
     mRNAString <- mRNAStrings[[i]]
     totalSiteEngs <- c()
     allFeats <- c()
     for(j in 1:9) {
       classSiteEnds <- siteEnds[[j]][[i]]
-      className <- paste0("c",j)
       classFeats <- rep(NaN, 4)
-      # names(classFeats) <- paste0(
-      #   className, paste0("dupFreeEng", c("Min", "Mean", "Median", "Var")))
       if(!is.null(classSiteEnds)){
         seqFileString <- paste0(">miRNA\n", miRNA, "\n")
         for(k in 1:length(classSiteEnds)){
@@ -496,9 +492,9 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
         }
         write(seqFileString, "siteSeqs.seq")
         rnaUpOutput <- shell(
-          paste0(vRNADir, 'RNAup.exe" -b --no_output_file < testSeqFile.seq'), 
+          paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq'), 
           intern = TRUE)
-        rnaUpOutEng <- rnaUpOut[seq(3, length(rnaUpOut), 3)]
+        rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
         freeEngStr <- regmatches(
           rnaUpOutEng, regexpr("=\\s-?\\d+\\.\\d\\d", rnaUpOutEng))
         freeEngStr <- gsub("= ", "", freeEngStr)
@@ -511,8 +507,6 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
     }
     everyFeats <- c(min(totalSiteEngs), mean(totalSiteEngs), 
                     median(totalSiteEngs), var(totalSiteEngs))
-    # names(everyFeats) <- paste0("dupFreeEng", 
-    #                             c("Min", "Mean", "Median", "Var"))
     allFeats <- c(allFeats, everyFeats)
     allFeats <- matrix(allFeats, nrow = 1, ncol = length(allFeats))
     colnames(allFeats) <- featNames

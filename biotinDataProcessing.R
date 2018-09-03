@@ -43,4 +43,5 @@ accToTarget <- accToTarget[accToTarget[,1] != "", ]
 accToTarget <- unique(accToTarget)
 
 mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget[,1], accToTarget[,2])
-
+freeEngFeats <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]], 
+                                     mir23b_featMat[[1]])
