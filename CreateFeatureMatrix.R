@@ -430,11 +430,12 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   
   # Lists of position ends. Can be used for analysis or extracting extra
   # features, etc
-  siteEnds <- list(sitesClass1[[1]], sitesClass2[[1]],
-                   sitesClass3[[1]], sitesClass4[[1]],
-                   sitesClass5[[1]], sitesClass6[[1]],
-                   sitesClass7[[1]], sitesClass8[[1]],
-                   sitesClass9[[1]])
+  siteEnds <- t(sapply(
+    1:length(acc), function(x) list(sitesClass1[[1]][[x]], sitesClass2[[1]][[x]],
+                                    sitesClass3[[1]][[x]], sitesClass4[[1]][[x]],
+                                    sitesClass5[[1]][[x]], sitesClass6[[1]][[x]],
+                                    sitesClass7[[1]][[x]], sitesClass8[[1]][[x]],
+                                    sitesClass9[[1]][[x]])))
   
   # Add collumn for total sites found accross all classes
   fullFeatTable$N <- rowSums(fullFeatTable[,paste0("nc", 1:9)])
@@ -466,6 +467,58 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
 }
 
 
+# siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
+#   output <- as.data.frame(matrix(nrow = 0, ncol = 10*4))
+#   featNames <- sapply(
+#     paste0("c", 1:9), function(x) paste0(
+#       x, paste0("_dupFreeEng", c("Min", "Mean", "Median", "Var"))))
+#   featNames <- c(featNames, paste0(
+#     "dupFreeEng", c("Min", "Mean", "Median", "Var")))
+#   colnames(output) <- featNames
+#   for(i in 1:length(mRNAStrings)) {
+#     mRNAString <- mRNAStrings[[i]]
+#     totalSiteEngs <- c()
+#     allFeats <- c()
+#     for(j in 1:9) {
+#       classSiteEnds <- siteEnds[i,][[j]]
+#       classFeats <- rep(NaN, 4)
+#       if(!is.null(classSiteEnds)){
+#         seqFileString <- paste0(">miRNA\n", miRNA, "\n")
+#         for(k in 1:length(classSiteEnds)){
+#           siteSeq <- subseq(
+#             mRNAString, start = max(1, classSiteEnds[k] - 25),
+#             end = classSiteEnds[k])
+#           seqFileString <- paste0(seqFileString, ">site", k, "\n",
+#                                   as.character(siteSeq), "\n")
+#         }
+#         write(seqFileString, "siteSeqs.seq")
+#         rnaUpOutput <- shell(
+#           paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq'),
+#           intern = TRUE)
+#         rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
+#         freeEngStr <- regmatches(
+#           rnaUpOutEng, regexpr("=\\s-?\\d+\\.\\d\\d", rnaUpOutEng))
+#         freeEngStr <- gsub("= ", "", freeEngStr)
+#         freeEng <- as.numeric(freeEngStr)
+#         totalSiteEngs <- c(totalSiteEngs, freeEng)
+#         classFeats <- c(min(freeEng), mean(freeEng), median(freeEng),
+#                         var(freeEng))
+#       }
+#       allFeats <- c(allFeats, classFeats)
+#     }
+#     everyFeats <- rep(NaN, 4)
+#     if(length(totalSiteEngs) > 0){
+#       everyFeats <- c(min(totalSiteEngs), mean(totalSiteEngs),
+#                       median(totalSiteEngs), var(totalSiteEngs))
+#     }
+#     allFeats <- c(allFeats, everyFeats)
+#     allFeats <- matrix(allFeats, nrow = 1, ncol = length(allFeats))
+#     colnames(allFeats) <- featNames
+#     output <- rbind(output, allFeats)
+#   }
+#   return(output)
+# }
+
 siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
   output <- as.data.frame(matrix(nrow = 0, ncol = 10*4))
   featNames <- sapply(
@@ -473,45 +526,51 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds) {
       x, paste0("_dupFreeEng", c("Min", "Mean", "Median", "Var"))))
   featNames <- c(featNames, paste0(
     "dupFreeEng", c("Min", "Mean", "Median", "Var")))
+  output <- t(sapply(1:length(mRNAStrings),
+                   function(x) freeEngRNA(miRNA, mRNAStrings[[x]],
+                                          siteEnds[x,])))
   colnames(output) <- featNames
-  for(i in 1:length(mRNAStrings)) {
-    mRNAString <- mRNAStrings[[i]]
-    totalSiteEngs <- c()
-    allFeats <- c()
-    for(j in 1:9) {
-      classSiteEnds <- siteEnds[[j]][[i]]
-      classFeats <- rep(NaN, 4)
-      if(!is.null(classSiteEnds)){
-        seqFileString <- paste0(">miRNA\n", miRNA, "\n")
-        for(k in 1:length(classSiteEnds)){
-          siteSeq <- subseq(
-            mRNAString, start = max(1, classSiteEnds[k] - 25), 
-            end = classSiteEnds[k])
-          seqFileString <- paste0(seqFileString, ">site", k, "\n",
-                                  as.character(siteSeq), "\n")
-        }
-        write(seqFileString, "siteSeqs.seq")
-        rnaUpOutput <- shell(
-          paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq'), 
-          intern = TRUE)
-        rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
-        freeEngStr <- regmatches(
-          rnaUpOutEng, regexpr("=\\s-?\\d+\\.\\d\\d", rnaUpOutEng))
-        freeEngStr <- gsub("= ", "", freeEngStr)
-        freeEng <- as.numeric(freeEngStr)
-        totalSiteEngs <- c(totalSiteEngs, freeEng)
-        classFeats <- c(min(freeEng), mean(freeEng), median(freeEng), 
-                        var(freeEng))
-      }
-      allFeats <- c(allFeats, classFeats)
-    }
-    everyFeats <- c(min(totalSiteEngs), mean(totalSiteEngs), 
-                    median(totalSiteEngs), var(totalSiteEngs))
-    allFeats <- c(allFeats, everyFeats)
-    allFeats <- matrix(allFeats, nrow = 1, ncol = length(allFeats))
-    colnames(allFeats) <- featNames
-    output <- rbind(output, allFeats)
-  }
   return(output)
 }
 
+freeEngRNA <- function(miRNA, rna, siteEnds) {
+  engsAndFeats <- sapply(siteEnds, freeEngRNAClass, miRNA = miRNA,
+                         rna = rna)
+  totalSiteEngs <- unlist(engsAndFeats[1,])
+  allFeats <- unlist(engsAndFeats[2,])
+  everyFeats <- rep(NaN, 4)
+  if(length(totalSiteEngs) > 0){
+    everyFeats <- c(min(totalSiteEngs), mean(totalSiteEngs),
+                    median(totalSiteEngs), var(totalSiteEngs))
+  }
+  allFeats <- c(allFeats, everyFeats)
+  # allFeats <- matrix(allFeats, nrow = 1, ncol = length(allFeats))
+  return(allFeats)
+}
+
+freeEngRNAClass <- function(classSiteEnds, miRNA, rna){
+  classFeats <- rep(NaN, 4)
+  freeEng <- c()
+  if(!is.null(classSiteEnds)){
+    seqFileString <- paste0(">miRNA\n", miRNA, "\n")
+    for(k in 1:length(classSiteEnds)){
+      siteSeq <- subseq(
+        rna, start = max(1, classSiteEnds[k] - 25),
+        end = classSiteEnds[k])
+      seqFileString <- paste0(seqFileString, ">site", k, "\n",
+                              as.character(siteSeq), "\n")
+    }
+    write(seqFileString, "siteSeqs.seq")
+    rnaUpOutput <- shell(
+      paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq'),
+      intern = TRUE)
+    rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
+    freeEngStr <- regmatches(
+      rnaUpOutEng, regexpr("=\\s-?\\d+\\.\\d\\d", rnaUpOutEng))
+    freeEngStr <- gsub("= ", "", freeEngStr)
+    freeEng <- as.numeric(freeEngStr)
+    classFeats <- c(min(freeEng), mean(freeEng), median(freeEng),
+                    var(freeEng))
+  }
+  return(list(freeEng, classFeats))
+}
