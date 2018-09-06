@@ -13,110 +13,175 @@ miR23b <- "AUCACAUUGCCAGGGAUUACC"
 layout <- c("pulldown", "control", "pulldown", "control")
 design<-model.matrix(~0+layout)
 colnames(design)<-c("control","pulldown")
-fit<-lmFit(assayDat$exprs[,c(1:4)], design)
-cont.matrix <- makeContrasts(PullDownvsControl=pulldown-control, 
+# Columns 1:4 are miR23b
+fit_23b<-lmFit(assayDat$exprs[,c(1:4)], design)
+cont.matrix.23b <- makeContrasts(PullDownvsControl=pulldown-control, 
                              levels=design)
-fit2 <- contrasts.fit(fit, cont.matrix)
-fit2 <- eBayes(fit2)
-full_gene_list<-topTable(fit2, coef=1, number=1000000, sort.by="logFC")
-plot(full_gene_list$logFC, -log10(full_gene_list$P.Value), 
+fit2_23b <- contrasts.fit(fit_23b, cont.matrix.23b)
+fit2_23b <- eBayes(fit2_23b)
+full_gene_list_23b<-topTable(fit2_23b, coef=1, number=1000000, sort.by="logFC")
+plot(full_gene_list_23b$logFC, -log10(full_gene_list_23b$P.Value), 
      xlab="log2 fold change", ylab="-log10 p-value")
 
 # miR-23b targets defined as below log2FoldChange threshold -1 and 
 # above -log10pValue threshold of -log10(0.05) 
 # Maybe need a better reason for these thresholds other than 
 # "because that's what other bpd studies used"
-targets <- full_gene_list[full_gene_list$logFC < -1 
-                          & -log10(full_gene_list$P.Value) > -log10(0.05), ]
+targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < -1 
+                          & -log10(full_gene_list_23b$P.Value) > -log10(0.05), ]
 # Is everything else really non-targets?
-nontargets <- full_gene_list[!row.names(full_gene_list) 
-                             %in% row.names(targets), ]
+nontargets_23b <- full_gene_list_23b[!row.names(full_gene_list_23b) 
+                             %in% row.names(targets_23b), ]
 # Get genbank accession numbers
-genbankAcc <- featDatTable$`GenBank Accession`
+genbankAcc_23b <- featDatTable$`GenBank Accession`
 # Create a column for 1 being target and 0 being non target
-targetCol <- rep(0, nrow(full_gene_list))
-targetCol[row.names(full_gene_list) %in% row.names(targets)] <- 1
+targetCol_23b <- rep(0, nrow(full_gene_list_23b))
+targetCol_23b[row.names(full_gene_list_23b) %in% row.names(targets_23b)] <- 1
 
-accToTarget <- cbind(genbankAcc, targetCol)
+accToTarget_23b <- cbind(genbankAcc_23b, targetCol_23b)
 # Removing repeats and RNA with no acc numbers
-accToTarget <- accToTarget[accToTarget[,1] != "", ]
-accToTarget <- unique(accToTarget)
+accToTarget_23b <- accToTarget_23b[accToTarget_23b[,1] != "", ]
 
-mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget[,1], accToTarget[,2])
-freeEngFeats <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]], 
+dealWithRepAcc <- function(accToTarget){
+  accCounts <- table(accToTarget[,1])
+  repeatedAcc <- names(accCounts[accCounts > 1])
+  toRemove <- c()
+  for(acc in repeatedAcc){
+    targCount <- table(accToTarget[accToTarget[,1] == acc, 2])
+    # Mark the ambigous Accession numbers for removal
+    if(length(targCount) > 1){
+      toRemove <- c(toRemove, acc)
+    }
+  }
+  accToTarget <- accToTarget[!(accToTarget[,1] %in% toRemove),]
+  accToTarget <- unique(accToTarget)
+  return(accToTarget)
+}
+accToTarget_23b <- dealWithRepAcc(accToTarget_23b)
+
+mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget_23b[,1], accToTarget_23b[,2])
+freeEngFeats_23b <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]], 
                                      mir23b_featMat[[1]])
 
-# startTime <- Sys.time()
-# tst <- siteDuplexFreeEnergy(miR23b, test_featMat[[2]], 
-#                      test_featMat[[1]])
-# Sys.time() - startTime
+# Processing mir27a data
+mir27a <- "UUCACAGUGGCUAAGUUCCGC"
+# Columns 5:8 are miR27a
+fit_27a<-lmFit(assayDat$exprs[,c(5:8)], design)
+cont.matrix.27a <- makeContrasts(PullDownvsControl=pulldown-control, 
+                                 levels=design)
+fit2_27a <- contrasts.fit(fit_27a, cont.matrix.27a)
+fit2_27a <- eBayes(fit2_27a)
+full_gene_list_27a<-topTable(fit2_27a, coef=1, number=1000000, sort.by="logFC")
+plot(full_gene_list_27a$logFC, -log10(full_gene_list_27a$P.Value), 
+     xlab="log2 fold change", ylab="-log10 p-value")
+
+# miR-27a targets defined as below log2FoldChange threshold -1 and 
+# above -log10pValue threshold of -log10(0.05) 
+targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < -1 
+                                  & -log10(full_gene_list_27a$P.Value) > -log10(0.05), ]
+# Is everything else really non-targets?
+nontargets_27a <- full_gene_list_27a[!row.names(full_gene_list_27a) 
+                                     %in% row.names(targets_27a), ]
+# Get genbank accession numbers
+genbankAcc_27a <- featDatTable$`GenBank Accession`
+# Create a column for 1 being target and 0 being non target
+targetCol_27a <- rep(0, nrow(full_gene_list_27a))
+targetCol_27a[row.names(full_gene_list_27a) %in% row.names(targets_27a)] <- 1
+
+accToTarget_27a <- cbind(genbankAcc_27a, targetCol_27a)
+# Removing repeats and RNA with no acc numbers
+accToTarget_27a <- accToTarget_27a[accToTarget_27a[,1] != "", ]
+accToTarget_27a <- dealWithRepAcc(accToTarget_27a)
+# Any repeated accession numbers left would have been classed as both
+# target and non-taget. Need to remove these
+
+
+mir27a_featMat <- createFeatureMatrix(mir27a, accToTarget_27a[,1], accToTarget_27a[,2])
+freeEngFeats_27a <- siteDuplexFreeEnergy(mir27a, mir27a_featMat[[2]], 
+                                         mir27a_featMat[[1]])
+
+
+
+startTime <- Sys.time()
+tst2 <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]][1:10],
+                     mir23b_featMat[[1]][1:10,])
+Sys.time() - startTime
 
 # Combining the tables
-featMatmir23b <- cbind(mir23b_featMat[[3]], freeEngFeats)
+featMatmir23b <- cbind(mir23b_featMat[[3]], freeEngFeats_23b)
+featMatmir27a <- cbind(mir27a_featMat[[3]], freeEngFeats_27a)
 
-# Dealing with missing values
-# NaN for mean, median and variance of distances of sites (of each class) 
-# from 3' end and from stop codon, and frequencies of nucleotides at positions
-# around sites, represent that there were no sites of that class
-#   - For nucleotide frequencies, set NaN to 0
-#   - For distance from 3' end set NaN to -1
-#   - For distance from stop codon set NaN to -max double
-#   - For siteFreeEng set NaN to max double
-# NA for variance of distances of sites (of each class) represent that
-# there was only one site of that class
-#   - For variance, set NA to 0
-# NA for mean meadian and variance of distances of sites from stop codon
-# and for frequencies of sites in regions of mRNA represent the RNA is 
-# not mRNA
-#   - For mean and median set NA to max double
-#   - For variance set NA to 0
-#   - For region frequencies set NA to 0
-
-# NaN nucleotide frequencies
-nucFreqCols <- colnames(featMatmir23b)[
-  grepl("c\\d_freq", colnames(featMatmir23b))]
-featMatmir23b[,nucFreqCols] <- t(
-  apply(featMatmir23b[,nucFreqCols], 1, 
-        function(x) {x[is.nan(x)] <- 0; return(x)}))
-# NaN 3' end distances
-endDistCols <- colnames(featMatmir23b)[
-  grepl("c\\d_end", colnames(featMatmir23b))]
-featMatmir23b[,endDistCols] <- t(
-  apply(featMatmir23b[,endDistCols], 1, 
-        function(x) {x[is.nan(x)] <- -1; return(x)}))
-# NaN stop codon distances
-stopDistCols <- colnames(featMatmir23b)[
-  grepl("c\\d_stop", colnames(featMatmir23b))]
-featMatmir23b[,stopDistCols] <- t(
-  apply(featMatmir23b[,stopDistCols], 1, 
-        function(x) {x[is.nan(x)] <- -.Machine$double.xmax; return(x)}))
-# NaN duplex free energy
-dupFreeEngCols <- colnames(featMatmir23b)[
-  grepl("dup", colnames(featMatmir23b))]
-featMatmir23b[,dupFreeEngCols] <- t(
-  apply(featMatmir23b[,dupFreeEngCols], 1, 
-        function(x) {x[is.nan(x)] <- .Machine$double.xmax; return(x)}))
-# NA variance
-varCols <- colnames(featMatmir23b)[
-  grepl("Var", colnames(featMatmir23b))]
-featMatmir23b[,varCols] <- t(
-  apply(featMatmir23b[,varCols], 1, 
-        function(x) {x[is.na(x)] <- 0; return(x)}))
-# NA stop codon distances
-featMatmir23b[,stopDistCols] <- t(
-  apply(featMatmir23b[,stopDistCols], 1, 
-        function(x) {x[is.na(x)] <- .Machine$double.xmax; return(x)}))
-# NA region frequencies
-regionCols <- colnames(featMatmir23b)[
-  grepl("c\\d_(5'UTR|CDS|3'UTR)", colnames(featMatmir23b))]
-featMatmir23b[,regionCols] <- t(
-  apply(featMatmir23b[,regionCols], 1, 
-        function(x) {x[is.na(x)] <- 0; return(x)}))
-
-# Random Forest does not like column names with symbols in them
-colnames(featMatmir23b) <- gsub("'", "", colnames(featMatmir23b))
-colnames(featMatmir23b) <- gsub("-", "neg", colnames(featMatmir23b))
-featMatmir23b$Target <- as.factor(featMatmir23b$Target)
+convertMissingValues <- function(featMat){
+  # Dealing with missing values
+  # NaN for mean, median and variance of distances of sites (of each class) 
+  # from 3' end and from stop codon, and frequencies of nucleotides at positions
+  # around sites, represent that there were no sites of that class
+  #   - For nucleotide frequencies, set NaN to 0
+  #   - For distance from 3' end set NaN to -1
+  #   - For distance from stop codon set NaN to -max double
+  #   - For siteFreeEng set NaN to max double
+  # NA for variance of distances of sites (of each class) represent that
+  # there was only one site of that class
+  #   - For variance, set NA to 0
+  # NA for mean meadian and variance of distances of sites from stop codon
+  # and for frequencies of sites in regions of mRNA represent the RNA is 
+  # not mRNA
+  #   - For mean and median set NA to max double
+  #   - For variance set NA to 0
+  #   - For region frequencies set NA to 0
+  
+  # NaN nucleotide frequencies
+  nucFreqCols <- colnames(featMat)[
+    grepl("c\\d_freq", colnames(featMat))]
+  featMat[,nucFreqCols] <- t(
+    apply(featMat[,nucFreqCols], 1, 
+          function(x) {x[is.nan(x)] <- 0; return(x)}))
+  # NaN 3' end distances
+  endDistCols <- colnames(featMat)[
+    grepl("c\\d_end", colnames(featMat))]
+  featMat[,endDistCols] <- t(
+    apply(featMat[,endDistCols], 1, 
+          function(x) {x[is.nan(x)] <- -1; return(x)}))
+  # NaN stop codon distances
+  stopDistCols <- colnames(featMat)[
+    grepl("c\\d_stop", colnames(featMat))]
+  featMat[,stopDistCols] <- t(
+    apply(featMat[,stopDistCols], 1, 
+          function(x) {x[is.nan(x)] <- -.Machine$double.xmax; return(x)}))
+  # NaN duplex free energy
+  dupFreeEngCols <- colnames(featMat)[
+    grepl("dup", colnames(featMat))]
+  featMat[,dupFreeEngCols] <- t(
+    apply(featMat[,dupFreeEngCols], 1, 
+          function(x) {x[is.nan(x)] <- .Machine$double.xmax; return(x)}))
+  # NA variance
+  varCols <- colnames(featMat)[
+    grepl("Var", colnames(featMat))]
+  featMat[,varCols] <- t(
+    apply(featMat[,varCols], 1, 
+          function(x) {x[is.na(x)] <- 0; return(x)}))
+  # NA stop codon distances
+  featMat[,stopDistCols] <- t(
+    apply(featMat[,stopDistCols], 1, 
+          function(x) {x[is.na(x)] <- .Machine$double.xmax; return(x)}))
+  # NA region frequencies
+  regionCols <- colnames(featMat)[
+    grepl("c\\d_(5'UTR|CDS|3'UTR)", colnames(featMat))]
+  featMat[,regionCols] <- t(
+    apply(featMat[,regionCols], 1, 
+          function(x) {x[is.na(x)] <- 0; return(x)}))
+  
+  # Random Forest does not like column names with symbols in them
+  colnames(featMat) <- gsub("'", "", colnames(featMat))
+  colnames(featMat) <- gsub("-", "neg", colnames(featMat))
+  featMat$Target <- as.factor(featMat$Target)
+}
+featMatmir23b <- convertMissingValues(featMatmir23b)
+featMatmir27a <- convertMissingValues(featMatmir27a)
 
 library(randomForest)
 miTarget_randomForest <- randomForest(Target ~ ., data = featMatmir23b)
+
+
+
+
