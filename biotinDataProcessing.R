@@ -92,20 +92,10 @@ accToTarget_27a <- cbind(genbankAcc_27a, targetCol_27a)
 # Removing repeats and RNA with no acc numbers
 accToTarget_27a <- accToTarget_27a[accToTarget_27a[,1] != "", ]
 accToTarget_27a <- dealWithRepAcc(accToTarget_27a)
-# Any repeated accession numbers left would have been classed as both
-# target and non-taget. Need to remove these
-
 
 mir27a_featMat <- createFeatureMatrix(mir27a, accToTarget_27a[,1], accToTarget_27a[,2])
 freeEngFeats_27a <- siteDuplexFreeEnergy(mir27a, mir27a_featMat[[2]], 
                                          mir27a_featMat[[1]])
-
-
-
-startTime <- Sys.time()
-tst2 <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]][1:10],
-                     mir23b_featMat[[1]][1:10,])
-Sys.time() - startTime
 
 # Combining the tables
 featMatmir23b <- cbind(mir23b_featMat[[3]], freeEngFeats_23b)
@@ -175,6 +165,8 @@ convertMissingValues <- function(featMat){
   colnames(featMat) <- gsub("'", "", colnames(featMat))
   colnames(featMat) <- gsub("-", "neg", colnames(featMat))
   featMat$Target <- as.factor(featMat$Target)
+  
+  return(featMat)
 }
 featMatmir23b <- convertMissingValues(featMatmir23b)
 featMatmir27a <- convertMissingValues(featMatmir27a)
