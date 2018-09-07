@@ -494,6 +494,7 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
 
 siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
 {
+  startTime <- Sys.time()
   output <- as.data.frame(matrix(nrow = 0, ncol = 10*4))
   featNames <- sapply(
     paste0("c", 1:9), function(x) paste0(
@@ -501,16 +502,18 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
   featNames <- c(featNames, paste0(
     "dupFreeEng", c("Min", "Mean", "Median", "Var")))
 
-  seqFileString <- paste0(">miRNA\n", miRNA, "\n")
   # Indicating which energy value of a site comes from which RNA
   siteFromRNA <- c()
   # Indicating which class of site the energy value is for
   siteFromClass <- c()
-
+  
+  # Have to divide up the 
+  
   # Writing the site seq file
+  seqFileString <- paste0(">miRNA\n", miRNA, "\n")
   for(i in 1:length(mRNAStrings)) {
     mRNAString <- mRNAStrings[[i]]
-    mRNAName <- names(mRNAStrings[[i]])
+    mRNAName <- names(mRNAStrings[i])
     for(j in 1:9) {
       classSiteEnds <- siteEnds[i,][[j]]
       if(!is.null(classSiteEnds)){
@@ -519,9 +522,10 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
           siteSeq <- subseq(
             mRNAString, start = max(1, siteEnd - 25),
             end = classSiteEnds[k])
+          siteSeqRNA <- gsub("T", "U", as.character(siteSeq))
           seqFileString <- paste0(
             seqFileString, ">mRNA ", mRNAName, ", site end ", siteEnd,
-            ", class ", j, "\n", as.character(siteSeq), "\n")
+            ", class ", j, "\n", siteSeqRNA, "\n")
           siteFromRNA <- c(siteFromRNA, i)
           siteFromClass <- c(siteFromClass, j)
         }
@@ -529,33 +533,45 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
     }
   }
   write(seqFileString, "siteSeqs.seq")
+  writeTime <- Sys.time()
+  cat("Writing Time: ", writeTime - startTime, "\n")
 
   # Running RNAup on the file
-  rnaUpOutput <- shell(
-    paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq'),
+  shell(
+    paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq > RNAupOUT.out'),
     intern = TRUE)
+  rnaUPTime <- Sys.time()
+  cat("RNAup time: ", rnaUPTime - writeTime, "\n")
+  rnaUpOutput <- strsplit(
+    readChar("RNAupOUT.out", file.info("RNAupOUT.out")$size), "\n")[[1]]
   rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
   freeEngStr <- regmatches(
     rnaUpOutEng, regexpr("=\\s-?\\d+\\.\\d\\d", rnaUpOutEng))
   freeEngStr <- gsub("= ", "", freeEngStr)
   freeEng <- as.numeric(freeEngStr)
+  readTime <- Sys.time()
+  cat("Read Time: ", readTime - rnaUPTime, "\n")
 
   # Creating the features
+  if(length(freeEng) != length(siteFromRNA)){
+    cat("DUNDUNDUN!!!!\n")
+  }
   engMat <- cbind(freeEng, siteFromRNA, siteFromClass)
   for(i in 1:length(mRNAStrings)){
-    totalSiteEngs <- engMat[engMat[,2] == i, ]
+    totalSiteEngs <- engMat[,2] == i
     classFeats <- rep(NaN, 4*9)
     everyFeats <- rep(NaN, 4)
-    if(nrow(totalSiteEngs) > 0){
-      everyFeats <- c(min(totalSiteEngs[,1]), mean(totalSiteEngs[,1]),
-                      median(totalSiteEngs[,1]), var(totalSiteEngs[,1]))
+    if(TRUE %in% totalSiteEngs){
+      everyFeats <- c(
+        min(engMat[totalSiteEngs,1]), mean(engMat[totalSiteEngs,1]),
+        median(engMat[totalSiteEngs,1]), var(engMat[totalSiteEngs,1]))
       for(j in 1:9) {
-        classEngs <- totalSiteEngs[,3] == j
+        classEngs <- engMat[,3] == j & engMat[,2] == i
         if(TRUE %in% classEngs){
-          classFeats[4*(j-1)+1] <- min(totalSiteEngs[classEngs,1])
-          classFeats[4*(j-1)+2] <- mean(totalSiteEngs[classEngs,1])
-          classFeats[4*(j-1)+3] <- median(totalSiteEngs[classEngs,1])
-          classFeats[4*(j-1)+4] <- var(totalSiteEngs[classEngs,1])
+          classFeats[4*(j-1)+1] <- min(engMat[classEngs,1])
+          classFeats[4*(j-1)+2] <- mean(engMat[classEngs,1])
+          classFeats[4*(j-1)+3] <- median(engMat[classEngs,1])
+          classFeats[4*(j-1)+4] <- var(engMat[classEngs,1])
         }
       }
     }
@@ -564,6 +580,8 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
     colnames(allFeats) <- featNames
     output <- rbind(output, allFeats)
   }
+  featTime <- Sys.time()
+  cat("Feature Creation time: ", featTime - readTime, "\n")
   return(output)
 }
 

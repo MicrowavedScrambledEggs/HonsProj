@@ -59,12 +59,34 @@ dealWithRepAcc <- function(accToTarget){
 }
 accToTarget_23b <- dealWithRepAcc(accToTarget_23b)
 
-mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget_23b[,1], accToTarget_23b[,2])
-freeEngFeats_23b <- siteDuplexFreeEnergy(miR23b, mir23b_featMat[[2]], 
-                                     mir23b_featMat[[1]])
+mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget_23b[,1], 
+                                      accToTarget_23b[,2])
+freeEngFeats_23b1 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][1:1000], mir23b_featMat[[1]][1:1000,])
+freeEngFeats_23b2 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][1001:2000], mir23b_featMat[[1]][1001:2000,])
+freeEngFeats_23b3 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][2001:3000], mir23b_featMat[[1]][2001:3000,])
+freeEngFeats_23b4 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][3001:4000], mir23b_featMat[[1]][3001:4000,])
+freeEngFeats_23b5 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][4001:5000], mir23b_featMat[[1]][4001:5000,])
+freeEngFeats_23b6 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][5001:6000], mir23b_featMat[[1]][5001:6000,])
+freeEngFeats_23b7 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][6001:7000], mir23b_featMat[[1]][6001:7000,])
+freeEngFeats_23b8 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][7001:8000], mir23b_featMat[[1]][7001:8000,])
+freeEngFeats_23b9 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][8001:9000], mir23b_featMat[[1]][8001:9000,])
+freeEngFeats_23b10 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][9001:10000], mir23b_featMat[[1]][9001:10000,])
+freeEngFeats_23b11 <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]][10001:length(mir23b_featMat[[2]])], 
+  mir23b_featMat[[1]][10001:length(mir23b_featMat[[2]]),])
 
-# Processing mir27a data
-mir27a <- "UUCACAGUGGCUAAGUUCCGC"
+# Processing miR27a data
+miR27a <- "UUCACAGUGGCUAAGUUCCGC"
 # Columns 5:8 are miR27a
 fit_27a<-lmFit(assayDat$exprs[,c(5:8)], design)
 cont.matrix.27a <- makeContrasts(PullDownvsControl=pulldown-control, 
@@ -93,13 +115,52 @@ accToTarget_27a <- cbind(genbankAcc_27a, targetCol_27a)
 accToTarget_27a <- accToTarget_27a[accToTarget_27a[,1] != "", ]
 accToTarget_27a <- dealWithRepAcc(accToTarget_27a)
 
-mir27a_featMat <- createFeatureMatrix(mir27a, accToTarget_27a[,1], accToTarget_27a[,2])
-freeEngFeats_27a <- siteDuplexFreeEnergy(mir27a, mir27a_featMat[[2]], 
-                                         mir27a_featMat[[1]])
+mir27a_featMat <- createFeatureMatrix(miR27a, accToTarget_27a[,1], 
+                                      accToTarget_27a[,2])
+freeEngFeats_27a1 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][1:1000], mir27a_featMat[[1]][1:1000,])
+freeEngFeats_27a2 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][1001:2000], mir27a_featMat[[1]][1001:2000,])
+freeEngFeats_27a3 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][2001:3000], mir27a_featMat[[1]][2001:3000,])
+freeEngFeats_27a4 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][3001:4000], mir27a_featMat[[1]][3001:4000,])
+freeEngFeats_27a5 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][4001:5000], mir27a_featMat[[1]][4001:5000,])
+freeEngFeats_27a6 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][5001:6000], mir27a_featMat[[1]][5001:6000,])
+freeEngFeats_27a7 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][6001:7000], mir27a_featMat[[1]][6001:7000,])
+freeEngFeats_27a8 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][7001:8000], mir27a_featMat[[1]][7001:8000,])
+freeEngFeats_27a9 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][8001:9000], mir27a_featMat[[1]][8001:9000,])
+freeEngFeats_27a10 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][9001:10000], mir27a_featMat[[1]][9001:10000,])
+freeEngFeats_27a11 <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]][10001:length(mir27a_featMat[[2]])], 
+  mir27a_featMat[[1]][10001:length(mir27a_featMat[[2]]),])
 
 # Combining the tables
-featMatmir23b <- cbind(mir23b_featMat[[3]], freeEngFeats_23b)
-featMatmir27a <- cbind(mir27a_featMat[[3]], freeEngFeats_27a)
+freeEngFeats_23b <- rbind(freeEngFeats_23b1, freeEngFeats_23b2, 
+                          freeEngFeats_23b3, freeEngFeats_23b4,
+                          freeEngFeats_23b5, freeEngFeats_23b6,
+                          freeEngFeats_23b7, freeEngFeats_23b8,
+                          freeEngFeats_23b9, freeEngFeats_23b10,
+                          freeEngFeats_23b11)
+freeEngFeats_27a <- rbind(freeEngFeats_27a1, freeEngFeats_27a2, 
+                          freeEngFeats_27a3, freeEngFeats_27a4,
+                          freeEngFeats_27a5, freeEngFeats_27a6,
+                          freeEngFeats_27a7, freeEngFeats_27a8,
+                          freeEngFeats_27a9, freeEngFeats_27a10,
+                          freeEngFeats_27a11)
+freeEngFeats_23b$GenBank.Accession <- names(mir23b_featMat[[2]])
+freeEngFeats_27a$GenBank.Accession <- names(mir27a_featMat[[2]])
+# Have to merge instead of cbind as rows are not necesarily in the same order
+featMatmir23b <- merge(mir23b_featMat[[3]], freeEngFeats_23b, 
+                       by = "GenBank.Accession")
+featMatmir27a <- merge(mir27a_featMat[[3]], freeEngFeats_27a,
+                       by = "GenBank.Accession")
 
 convertMissingValues <- function(featMat){
   # Dealing with missing values
@@ -171,9 +232,7 @@ convertMissingValues <- function(featMat){
 featMatmir23b <- convertMissingValues(featMatmir23b)
 featMatmir27a <- convertMissingValues(featMatmir27a)
 
-library(randomForest)
-miTarget_randomForest <- randomForest(Target ~ ., data = featMatmir23b)
-
-
+# MORE DATA
+cloonan23b27a <- getGEO("GSE40410", GSEMatrix =TRUE, AnnotGPL=TRUE)
 
 
