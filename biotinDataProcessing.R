@@ -171,8 +171,7 @@ convertMissingValues <- function(featMat){
 featMatmir23b <- convertMissingValues(featMatmir23b)
 featMatmir27a <- convertMissingValues(featMatmir27a)
 
-library(randomForest)
-miTarget_randomForest <- randomForest(Target ~ ., data = featMatmir23b)
+
 
 
 
