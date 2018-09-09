@@ -10,12 +10,12 @@ nucWin <- dwnStrm + upStrm + 1
 
 # Directory where the ViennaRNA executables are. Edit when running on
 # windows systems where you can not add the directory to PATH
-vRNADir <- ""
+vRNADir <- '"'
 if(grepl("H:/", getwd())) vRNADir <- '"C:/Users/bjam575/AppData/Local/ViennaRNA Package/'
 
 # Read in already downloaded sequences and annotations so we don't have
 # to query dbs every time
-# accSeqRegions <- read.csv("accSeqRegions.csv")
+accSeqRegions <- read.csv("accSeqRegions.csv")
 
 
 querymRNASequence <- function(accNos){
@@ -24,8 +24,8 @@ querymRNASequence <- function(accNos){
   # Parse the codon start and stop out of the feature tables
   
   output <- as.data.frame(matrix(nrow = 0, ncol = 4))
-  colnames(output) <- c("GenBank Accession", "Full Sequence", "CDS Start",
-                        "CDS Stop")
+  colnames(output) <- c("GenBank.Accession", "Full.Sequence", "CDS.Start",
+                        "CDS.Stop")
   
   # Because we're usually dealling with 1e4 to 1.5e4 RNAs we need split
   # the request into chunks
@@ -46,7 +46,7 @@ querymRNASequence <- function(accNos){
     cdsStarts <- sapply(cdsList, function(x) as.integer(x[1]))
     cdsStops <- sapply(cdsList, function(x) as.integer(x[2]))
     chunk <- as.data.frame(cbind(accChunk, seqsStrings))
-    colnames(chunk) <- c("GenBank Accession", "Full Sequence")
+    colnames(chunk) <- c("GenBank.Accession", "Full.Sequence")
     chunk$CDS.Start <- rep(NaN, length(accChunk))
     chunk$CDS.Start[hasCDS != -1] <- cdsStarts
     chunk$CDS.Stop <- rep(NaN, length(accChunk))
@@ -181,6 +181,7 @@ nucFreqAroundSites <- function(dnastring, siteEnds)
 sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS, 
                          centeredClass = NULL) 
 {
+  cat("Finding sites of class ", nameOfClass, " and measuring features\n")
   # TODO: Document this disgustingly long method
   if(class(classSearch) != "DNAStringSet"){
     classSearch <- DNAStringSet(classSearch) # allows inputting a single DNAString
@@ -310,7 +311,7 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   miNucIdenFeats[1:length(miNucIdenVec)] <- miNucIdenVec
   
   miRNAString <- DNAString(miRNAString)
-  
+  cat("Looking up mRNA sequences and annotations\n")
   # Collect sequences and CDS start-stop for the accession numbers we have 
   # predownloaded sequences for
   seqAndCDS <- accSeqRegions[
@@ -322,10 +323,11 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   # start and stop sites
   newAcc <- acc[!(acc %in% seqAndCDS$GenBank.Accession)]
   if(length(newAcc) > 0) {
+    cat("Downloading new sequences and anotations\n")
     newSeqAndCDS <- querymRNASequence(newAcc)
     # Save the new ones for next time
-    write.csv(newSeqAndCDS, file = "accSeqRegions.csv", append = TRUE,
-              row.names = FALSE)
+    write.table(newSeqAndCDS, file = "accSeqRegions.csv", append = TRUE,
+              row.names = FALSE, col.names = FALSE, sep = ",")
   
     seqAndCDS <- rbind(seqAndCDS, newSeqAndCDS)
   }
