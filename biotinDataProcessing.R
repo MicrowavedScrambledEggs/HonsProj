@@ -336,3 +336,26 @@ freeEngFeats_3118.15 <- siteDuplexFreeEnergy(
   miR3118, mir3118_featMat[[2]][9501:length(mir3118_featMat[[2]])], 
   mir3118_featMat[[1]][9501:length(mir3118_featMat[[2]]),])
 
+freeEngFeats_4307.1 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][1:1000], mir4307_featMat[[1]][1:1000,])
+freeEngFeats_4307.2 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][1001:2000], mir4307_featMat[[1]][1001:2000,])
+freeEngFeats_4307.3 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][2001:3000], mir4307_featMat[[1]][2001:3000,])
+freeEngFeats_4307.4 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][3001:4000], mir4307_featMat[[1]][3001:4000,])
+freeEngFeats_4307.5 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][4001:5000], mir4307_featMat[[1]][4001:5000,])
+freeEngFeats_4307.6 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][5001:6000], mir4307_featMat[[1]][5001:6000,])
+freeEngFeats_4307.7 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][6001:7000], mir4307_featMat[[1]][6001:7000,])
+freeEngFeats_4307.8 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][7001:8000], mir4307_featMat[[1]][7001:8000,])
+freeEngFeats_4307.9 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][8001:9000], mir4307_featMat[[1]][8001:9000,])
+freeEngFeats_4307.10 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][9001:10000], mir4307_featMat[[1]][9001:10000,])
+freeEngFeats_4307.11 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]][10001:length(mir4307_featMat[[2]])], 
+  mir4307_featMat[[1]][10001:length(mir4307_featMat[[2]]),])

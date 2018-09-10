@@ -15,7 +15,7 @@ if(grepl("H:/", getwd())) vRNADir <- '"C:/Users/bjam575/AppData/Local/ViennaRNA 
 
 # Read in already downloaded sequences and annotations so we don't have
 # to query dbs every time
-accSeqRegions <- read.csv("accSeqRegions.csv")
+# accSeqRegions <- read.csv("accSeqRegions.csv")
 
 
 querymRNASequence <- function(accNos){
