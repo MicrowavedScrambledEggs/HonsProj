@@ -23,11 +23,11 @@ full_gene_list_23b<-topTable(fit2_23b, coef=1, number=1000000, sort.by="logFC")
 plot(full_gene_list_23b$logFC, -log10(full_gene_list_23b$P.Value), 
      xlab="log2 fold change", ylab="-log10 p-value")
 
-# miR-23b targets defined as below log2FoldChange threshold -1 and 
+# miR-23b targets defined as below log2FoldChange threshold 1 and 
 # above -log10pValue threshold of -log10(0.05) 
 # Maybe need a better reason for these thresholds other than 
 # "because that's what other bpd studies used"
-targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < -1 
+targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < 1 
                           & -log10(full_gene_list_23b$P.Value) > -log10(0.05), ]
 # Is everything else really non-targets?
 nontargets_23b <- full_gene_list_23b[!row.names(full_gene_list_23b) 
@@ -99,7 +99,7 @@ plot(full_gene_list_27a$logFC, -log10(full_gene_list_27a$P.Value),
 
 # miR-27a targets defined as below log2FoldChange threshold -1 and 
 # above -log10pValue threshold of -log10(0.05) 
-targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < -1 
+targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < 1 
                                   & -log10(full_gene_list_27a$P.Value) > -log10(0.05), ]
 # Is everything else really non-targets?
 nontargets_27a <- full_gene_list_27a[!row.names(full_gene_list_27a) 
@@ -238,6 +238,7 @@ featDat3118_4307 <- featureData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 featDatTable3118_4307 <- fData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 assayDat3118_4307 <- assayData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 phenoDat3118_4307 <- phenoData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
+pDatTable3118_4307 <- pData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 
 miR3118 <- "UGUGACUGCAUUAUGAAAAUUCU"
 # Volcano plot for miR-23b. Feeling like a script kidde here
@@ -265,7 +266,7 @@ full_gene_list_4307<-topTable(fit2_4307, coef=1, number=1000000, sort.by="logFC"
 plot(full_gene_list_4307$logFC, -log10(full_gene_list_4307$P.Value), 
      xlab="log2 fold change", ylab="-log10 p-value")
 
-targets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC < -1 
+targets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC < 1 
                                   & -log10(full_gene_list_3118$P.Value) > -log10(0.05), ]
 # Is everything else really non-targets?
 nontargets_3118 <- full_gene_list_3118[!row.names(full_gene_list_3118) 
@@ -285,7 +286,7 @@ mir3118_featMat <- createFeatureMatrix(miR3118, accToTarget_3118[,1],
                                       accToTarget_3118[,2])
 
 # miR4307 targets and features
-targets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC < -1 
+targets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC < 1 
                                     & -log10(full_gene_list_4307$P.Value) > -log10(0.05), ]
 # Is everything else really non-targets?
 nontargets_4307 <- full_gene_list_4307[!row.names(full_gene_list_4307) 
@@ -336,6 +337,15 @@ freeEngFeats_3118.15 <- siteDuplexFreeEnergy(
   miR3118, mir3118_featMat[[2]][9501:length(mir3118_featMat[[2]])], 
   mir3118_featMat[[1]][9501:length(mir3118_featMat[[2]]),])
 
+freeEngFeats_3118 <- rbind(freeEngFeats_3118.1, freeEngFeats_3118.2, 
+                           freeEngFeats_3118.3, freeEngFeats_3118.4,
+                           freeEngFeats_3118.5, freeEngFeats_3118.6,
+                           freeEngFeats_3118.7, freeEngFeats_3118.8,
+                           freeEngFeats_3118.9, freeEngFeats_3118.10,
+                           freeEngFeats_3118.11, freeEngFeats_3118.12,
+                           freeEngFeats_3118.13, freeEngFeats_3118.14,
+                           freeEngFeats_3118.15)
+
 freeEngFeats_4307.1 <- siteDuplexFreeEnergy(
   miR4307, mir4307_featMat[[2]][1:1000], mir4307_featMat[[1]][1:1000,])
 freeEngFeats_4307.2 <- siteDuplexFreeEnergy(
@@ -359,3 +369,24 @@ freeEngFeats_4307.10 <- siteDuplexFreeEnergy(
 freeEngFeats_4307.11 <- siteDuplexFreeEnergy(
   miR4307, mir4307_featMat[[2]][10001:length(mir4307_featMat[[2]])], 
   mir4307_featMat[[1]][10001:length(mir4307_featMat[[2]]),])
+
+freeEngFeats_4307 <- rbind(freeEngFeats_4307.1, freeEngFeats_4307.2, 
+                           freeEngFeats_4307.3, freeEngFeats_4307.4,
+                           freeEngFeats_4307.5, freeEngFeats_4307.6,
+                           freeEngFeats_4307.7, freeEngFeats_4307.8,
+                           freeEngFeats_4307.9, freeEngFeats_4307.10,
+                           freeEngFeats_4307.11)
+
+freeEngFeats_3118$GenBank.Accession <- names(mir3118_featMat[[2]])
+freeEngFeats_4307$GenBank.Accession <- names(mir4307_featMat[[2]])
+
+featMatmir3118 <- merge(mir3118_matrix, freeEngFeats_3118, 
+                        by = "GenBank.Accession")
+featMatmir3118 <- convertMissingValues(featMatmir3118)
+featMatmir4307 <- merge(mir4307_matrix, freeEngFeats_4307, 
+                        by = "GenBank.Accession")
+featMatmir4307 <- convertMissingValues(featMatmir4307)
+
+fullFeatMat <- rbind(featMatmir23b, featMatmir27a, featMatmir3118, 
+                     featMatmir4307)
+fullFeatMatNoAcc <- fullFeatMat[, !colnames(fullFeatMat) %in% c("GenBank.Accession")]
