@@ -27,16 +27,20 @@ plot(full_gene_list_23b$logFC, -log10(full_gene_list_23b$P.Value),
 # above -log10pValue threshold of -log10(0.05) 
 # Maybe need a better reason for these thresholds other than 
 # "because that's what other bpd studies used"
-targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < 1 
+targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC > 1 
                           & -log10(full_gene_list_23b$P.Value) > -log10(0.05), ]
-# Is everything else really non-targets?
-nontargets_23b <- full_gene_list_23b[!row.names(full_gene_list_23b) 
-                             %in% row.names(targets_23b), ]
+# choose NOn targets that barely showed up in the pull downs
+nontargets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < -1 
+                                       & full_gene_list_23b$P.Value < 0.05, ]
 # Get genbank accession numbers
-genbankAcc_23b <- featDatTable$`GenBank Accession`
+genbankAcc_23b <- featDatTable$`GenBank Accession`[
+  row.names(featDatTable) %in% row.names(targets_23b)
+  ]
+genbankAcc_23b <- c(genbankAcc_23b, featDatTable$`GenBank Accession`[
+  row.names(featDatTable) %in% row.names(nontargets_23b)])
+
 # Create a column for 1 being target and 0 being non target
-targetCol_23b <- rep(0, nrow(full_gene_list_23b))
-targetCol_23b[row.names(full_gene_list_23b) %in% row.names(targets_23b)] <- 1
+targetCol_23b <- c(rep(1, nrow(targets_23b)), rep(0, nrow(nontargets_23b)))
 
 accToTarget_23b <- cbind(genbankAcc_23b, targetCol_23b)
 # Removing repeats and RNA with no acc numbers
@@ -99,16 +103,20 @@ plot(full_gene_list_27a$logFC, -log10(full_gene_list_27a$P.Value),
 
 # miR-27a targets defined as below log2FoldChange threshold -1 and 
 # above -log10pValue threshold of -log10(0.05) 
-targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < 1 
+targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC > 1 
                                   & -log10(full_gene_list_27a$P.Value) > -log10(0.05), ]
-# Is everything else really non-targets?
-nontargets_27a <- full_gene_list_27a[!row.names(full_gene_list_27a) 
-                                     %in% row.names(targets_27a), ]
+# choose NOn targets that barely showed up in the pull downs
+nontargets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < -1 
+                                     & full_gene_list_27a$P.Value < 0.05, ]
 # Get genbank accession numbers
-genbankAcc_27a <- featDatTable$`GenBank Accession`
+genbankAcc_27a <- featDatTable$`GenBank Accession`[
+  row.names(featDatTable) %in% row.names(targets_27a)
+]
+genbankAcc_27a <- c(genbankAcc_27a, featDatTable$`GenBank Accession`[
+  row.names(featDatTable) %in% row.names(nontargets_27a)])
+  
 # Create a column for 1 being target and 0 being non target
-targetCol_27a <- rep(0, nrow(full_gene_list_27a))
-targetCol_27a[row.names(full_gene_list_27a) %in% row.names(targets_27a)] <- 1
+targetCol_27a <- c(rep(1, nrow(targets_27a)), rep(0, nrow(nontargets_27a)))
 
 accToTarget_27a <- cbind(genbankAcc_27a, targetCol_27a)
 # Removing repeats and RNA with no acc numbers
@@ -266,16 +274,21 @@ full_gene_list_4307<-topTable(fit2_4307, coef=1, number=1000000, sort.by="logFC"
 plot(full_gene_list_4307$logFC, -log10(full_gene_list_4307$P.Value), 
      xlab="log2 fold change", ylab="-log10 p-value")
 
-targets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC < 1 
-                                  & -log10(full_gene_list_3118$P.Value) > -log10(0.05), ]
+targets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC > 1 
+                                  & full_gene_list_3118$P.Value < 0.05, ]
 # Is everything else really non-targets?
-nontargets_3118 <- full_gene_list_3118[!row.names(full_gene_list_3118) 
-                                     %in% row.names(targets_3118), ]
+# Not neccessarily. Use ones that barely showed up in the pull downs
+nontargets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC < -1 
+                                    & full_gene_list_3118$P.Value < 0.05, ]
 # Get genbank accession numbers
-genbankAcc_3118 <- featDatTable3118_4307$`GenBank Accession`
+genbankAcc_3118 <- featDatTable3118_4307$`GenBank Accession`[
+  row.names(featDatTable3118_4307) %in% row.names(targets_3118)
+  ]
+genbankAcc_3118 <- c(genbankAcc_3118, featDatTable3118_4307$`GenBank Accession`[
+  row.names(featDatTable3118_4307) %in% row.names(nontargets_3118)])
+
 # Create a column for 1 being target and 0 being non target
-targetCol_3118 <- rep(0, nrow(full_gene_list_3118))
-targetCol_3118[row.names(full_gene_list_3118) %in% row.names(targets_3118)] <- 1
+targetCol_3118 <- c(rep(1, nrow(targets_3118)), rep(0, nrow(nontargets_3118)))
 
 accToTarget_3118 <- cbind(genbankAcc_3118, targetCol_3118)
 # Removing repeats and RNA with no acc numbers
@@ -286,16 +299,20 @@ mir3118_featMat <- createFeatureMatrix(miR3118, accToTarget_3118[,1],
                                       accToTarget_3118[,2])
 
 # miR4307 targets and features
-targets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC < 1 
+targets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC > 1 
                                     & -log10(full_gene_list_4307$P.Value) > -log10(0.05), ]
-# Is everything else really non-targets?
-nontargets_4307 <- full_gene_list_4307[!row.names(full_gene_list_4307) 
-                                       %in% row.names(targets_4307), ]
+# choose NOn targets that barely showed up in the pull downs
+nontargets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC < -1 
+                                       & full_gene_list_4307$P.Value < 0.05, ]
 # Get genbank accession numbers
-genbankAcc_4307 <- featDatTable3118_4307$`GenBank Accession`
+genbankAcc_4307 <- featDatTable3118_4307$`GenBank Accession`[
+  row.names(featDatTable3118_4307) %in% row.names(targets_4307)
+  ]
+genbankAcc_4307 <- c(genbankAcc_4307, featDatTable3118_4307$`GenBank Accession`[
+  row.names(featDatTable3118_4307) %in% row.names(nontargets_4307)])
+
 # Create a column for 1 being target and 0 being non target
-targetCol_4307 <- rep(0, nrow(full_gene_list_4307))
-targetCol_4307[row.names(full_gene_list_4307) %in% row.names(targets_4307)] <- 1
+targetCol_4307 <- c(rep(1, nrow(targets_4307)), rep(0, nrow(nontargets_4307)))
 
 accToTarget_4307 <- cbind(genbankAcc_4307, targetCol_4307)
 # Removing repeats and RNA with no acc numbers
