@@ -8,43 +8,51 @@ featDat <- featureData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 featDatTable <- fData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 assayDat <- assayData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 
+measurelogFC <- function(assayDat, layout, cols){
+  design<-model.matrix(~0+layout)
+  colnames(design)<-c("control","pulldown")
+  fit<-lmFit(assayDat$exprs[,cols], design)
+  cont.matrix <- makeContrasts(PullDownvsControl=pulldown-control, 
+                               levels=design)
+  fit2 <- contrasts.fit(fit, cont.matrix)
+  fit2 <- eBayes(fit2)
+  full_gene_list<-topTable(fit2, coef=1, number=1000000, sort.by="logFC")
+  plot(full_gene_list_3118$logFC, -log10(full_gene_list_3118$P.Value), 
+       xlab="log2 fold change", ylab="-log10 p-value")
+  return(full_gene_list)
+}
+
 miR23b <- "AUCACAUUGCCAGGGAUUACC"
-# Volcano plot for miR-23b. Feeling like a script kidde here
+# Volcano plot for miR-23b.
 layout <- c("pulldown", "control", "pulldown", "control")
-design<-model.matrix(~0+layout)
-colnames(design)<-c("control","pulldown")
-# Columns 1:4 are miR23b
-fit_23b<-lmFit(assayDat$exprs[,c(1:4)], design)
-cont.matrix.23b <- makeContrasts(PullDownvsControl=pulldown-control, 
-                             levels=design)
-fit2_23b <- contrasts.fit(fit_23b, cont.matrix.23b)
-fit2_23b <- eBayes(fit2_23b)
-full_gene_list_23b<-topTable(fit2_23b, coef=1, number=1000000, sort.by="logFC")
-plot(full_gene_list_23b$logFC, -log10(full_gene_list_23b$P.Value), 
-     xlab="log2 fold change", ylab="-log10 p-value")
+full_gene_list_23b <- measurelogFC(assayDat, layout, 1:4)
 
-# miR-23b targets defined as below log2FoldChange threshold 1 and 
-# above -log10pValue threshold of -log10(0.05) 
-# Maybe need a better reason for these thresholds other than 
-# "because that's what other bpd studies used"
-targets_23b <- full_gene_list_23b[full_gene_list_23b$logFC > 1 
-                          & -log10(full_gene_list_23b$P.Value) > -log10(0.05), ]
-# choose NOn targets that barely showed up in the pull downs
-nontargets_23b <- full_gene_list_23b[full_gene_list_23b$logFC < -1 
-                                       & full_gene_list_23b$P.Value < 0.05, ]
-# Get genbank accession numbers
-genbankAcc_23b <- featDatTable$`GenBank Accession`[
-  row.names(featDatTable) %in% row.names(targets_23b)
-  ]
-genbankAcc_23b <- c(genbankAcc_23b, featDatTable$`GenBank Accession`[
-  row.names(featDatTable) %in% row.names(nontargets_23b)])
-
-# Create a column for 1 being target and 0 being non target
-targetCol_23b <- c(rep(1, nrow(targets_23b)), rep(0, nrow(nontargets_23b)))
-
-accToTarget_23b <- cbind(genbankAcc_23b, targetCol_23b)
-# Removing repeats and RNA with no acc numbers
-accToTarget_23b <- accToTarget_23b[accToTarget_23b[,1] != "", ]
+accToTargMat <- function(full_gene_list, featDatTable){
+  # targets defined as below log2FoldChange threshold 1 and 
+  # below p-value threshold of 0.05
+  # This is to ensure statistically significant targets that showed up at least
+  # twice as much in the pull down compared to the control
+  targets <- full_gene_list[full_gene_list$logFC > 1 
+                            & -log10(full_gene_list$P.Value) > -log10(0.05), ]
+  # choose NOn targets that barely showed up in the pull downs
+  nontargets <- full_gene_list[full_gene_list$logFC < -1 
+                               & full_gene_list$P.Value < 0.05, ]
+  # Get genbank accession numbers
+  genbankAcc <- featDatTable$`GenBank Accession`[
+    row.names(featDatTable) %in% row.names(targets)
+    ]
+  genbankAcc <- c(genbankAcc, featDatTable$`GenBank Accession`[
+    row.names(featDatTable) %in% row.names(nontargets)])
+  
+  # Create a column for 1 being target and 0 being non target
+  targetCol <- c(rep(1, nrow(targets)), rep(0, nrow(nontargets)))
+  
+  accToTarget <- cbind(genbankAcc, targetCol)
+  # Removing repeats and RNA with no acc numbers
+  accToTarget <- accToTarget[accToTarget[,1] != "", ]
+  accToTarget <- dealWithRepAcc(accToTarget)
+  return(accToTarget)
+}
 
 dealWithRepAcc <- function(accToTarget){
   accCounts <- table(accToTarget[,1])
@@ -61,107 +69,26 @@ dealWithRepAcc <- function(accToTarget){
   accToTarget <- unique(accToTarget)
   return(accToTarget)
 }
+
+accToTarget_23b <- accToTargMat(full_gene_list_23b, featDatTable)
 accToTarget_23b <- dealWithRepAcc(accToTarget_23b)
 
 mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget_23b[,1], 
                                       accToTarget_23b[,2])
-freeEngFeats_23b1 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][1:1000], mir23b_featMat[[1]][1:1000,])
-freeEngFeats_23b2 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][1001:2000], mir23b_featMat[[1]][1001:2000,])
-freeEngFeats_23b3 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][2001:3000], mir23b_featMat[[1]][2001:3000,])
-freeEngFeats_23b4 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][3001:4000], mir23b_featMat[[1]][3001:4000,])
-freeEngFeats_23b5 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][4001:5000], mir23b_featMat[[1]][4001:5000,])
-freeEngFeats_23b6 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][5001:6000], mir23b_featMat[[1]][5001:6000,])
-freeEngFeats_23b7 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][6001:7000], mir23b_featMat[[1]][6001:7000,])
-freeEngFeats_23b8 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][7001:8000], mir23b_featMat[[1]][7001:8000,])
-freeEngFeats_23b9 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][8001:9000], mir23b_featMat[[1]][8001:9000,])
-freeEngFeats_23b10 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][9001:10000], mir23b_featMat[[1]][9001:10000,])
-freeEngFeats_23b11 <- siteDuplexFreeEnergy(
-  miR23b, mir23b_featMat[[2]][10001:length(mir23b_featMat[[2]])], 
-  mir23b_featMat[[1]][10001:length(mir23b_featMat[[2]]),])
+freeEngFeats_23b <- siteDuplexFreeEnergy(
+  miR23b, mir23b_featMat[[2]], mir23b_featMat[[1]])
 
 # Processing miR27a data
 miR27a <- "UUCACAGUGGCUAAGUUCCGC"
 # Columns 5:8 are miR27a
-fit_27a<-lmFit(assayDat$exprs[,c(5:8)], design)
-cont.matrix.27a <- makeContrasts(PullDownvsControl=pulldown-control, 
-                                 levels=design)
-fit2_27a <- contrasts.fit(fit_27a, cont.matrix.27a)
-fit2_27a <- eBayes(fit2_27a)
-full_gene_list_27a<-topTable(fit2_27a, coef=1, number=1000000, sort.by="logFC")
-plot(full_gene_list_27a$logFC, -log10(full_gene_list_27a$P.Value), 
-     xlab="log2 fold change", ylab="-log10 p-value")
-
-# miR-27a targets defined as below log2FoldChange threshold -1 and 
-# above -log10pValue threshold of -log10(0.05) 
-targets_27a <- full_gene_list_27a[full_gene_list_27a$logFC > 1 
-                                  & -log10(full_gene_list_27a$P.Value) > -log10(0.05), ]
-# choose NOn targets that barely showed up in the pull downs
-nontargets_27a <- full_gene_list_27a[full_gene_list_27a$logFC < -1 
-                                     & full_gene_list_27a$P.Value < 0.05, ]
-# Get genbank accession numbers
-genbankAcc_27a <- featDatTable$`GenBank Accession`[
-  row.names(featDatTable) %in% row.names(targets_27a)
-]
-genbankAcc_27a <- c(genbankAcc_27a, featDatTable$`GenBank Accession`[
-  row.names(featDatTable) %in% row.names(nontargets_27a)])
-  
-# Create a column for 1 being target and 0 being non target
-targetCol_27a <- c(rep(1, nrow(targets_27a)), rep(0, nrow(nontargets_27a)))
-
-accToTarget_27a <- cbind(genbankAcc_27a, targetCol_27a)
-# Removing repeats and RNA with no acc numbers
-accToTarget_27a <- accToTarget_27a[accToTarget_27a[,1] != "", ]
-accToTarget_27a <- dealWithRepAcc(accToTarget_27a)
+full_gene_list_27a <- measurelogFC(assayDat, layout, 5:8)
+accToTarget_27a <- accToTargMat(full_gene_list_27a, featDatTable)
 
 mir27a_featMat <- createFeatureMatrix(miR27a, accToTarget_27a[,1], 
                                       accToTarget_27a[,2])
-freeEngFeats_27a1 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][1:1000], mir27a_featMat[[1]][1:1000,])
-freeEngFeats_27a2 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][1001:2000], mir27a_featMat[[1]][1001:2000,])
-freeEngFeats_27a3 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][2001:3000], mir27a_featMat[[1]][2001:3000,])
-freeEngFeats_27a4 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][3001:4000], mir27a_featMat[[1]][3001:4000,])
-freeEngFeats_27a5 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][4001:5000], mir27a_featMat[[1]][4001:5000,])
-freeEngFeats_27a6 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][5001:6000], mir27a_featMat[[1]][5001:6000,])
-freeEngFeats_27a7 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][6001:7000], mir27a_featMat[[1]][6001:7000,])
-freeEngFeats_27a8 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][7001:8000], mir27a_featMat[[1]][7001:8000,])
-freeEngFeats_27a9 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][8001:9000], mir27a_featMat[[1]][8001:9000,])
-freeEngFeats_27a10 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][9001:10000], mir27a_featMat[[1]][9001:10000,])
-freeEngFeats_27a11 <- siteDuplexFreeEnergy(
-  miR27a, mir27a_featMat[[2]][10001:length(mir27a_featMat[[2]])], 
-  mir27a_featMat[[1]][10001:length(mir27a_featMat[[2]]),])
+freeEngFeats_27a <- siteDuplexFreeEnergy(
+  miR27a, mir27a_featMat[[2]], mir27a_featMat[[1]])
 
-# Combining the tables
-freeEngFeats_23b <- rbind(freeEngFeats_23b1, freeEngFeats_23b2, 
-                          freeEngFeats_23b3, freeEngFeats_23b4,
-                          freeEngFeats_23b5, freeEngFeats_23b6,
-                          freeEngFeats_23b7, freeEngFeats_23b8,
-                          freeEngFeats_23b9, freeEngFeats_23b10,
-                          freeEngFeats_23b11)
-freeEngFeats_27a <- rbind(freeEngFeats_27a1, freeEngFeats_27a2, 
-                          freeEngFeats_27a3, freeEngFeats_27a4,
-                          freeEngFeats_27a5, freeEngFeats_27a6,
-                          freeEngFeats_27a7, freeEngFeats_27a8,
-                          freeEngFeats_27a9, freeEngFeats_27a10,
-                          freeEngFeats_27a11)
 freeEngFeats_23b$GenBank.Accession <- names(mir23b_featMat[[2]])
 freeEngFeats_27a$GenBank.Accession <- names(mir27a_featMat[[2]])
 # Have to merge instead of cbind as rows are not necesarily in the same order
@@ -235,6 +162,11 @@ convertMissingValues <- function(featMat){
   colnames(featMat) <- gsub("-", "neg", colnames(featMat))
   featMat$Target <- as.factor(featMat$Target)
   
+  # Make sure categorical features have all factor levels
+  miIdenCols <- colnames(featMat)[grepl("mi\\d", colnames(featMat))]
+  for(colu in miIdenCols)
+    levels(featMat[,colu]) <- c("A", "C", "G", "T", "X")
+  
   return(featMat)
 }
 featMatmir23b <- convertMissingValues(featMatmir23b)
@@ -249,150 +181,29 @@ phenoDat3118_4307 <- phenoData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 pDatTable3118_4307 <- pData(cloonan3118_4307$GSE40409_series_matrix.txt.gz)
 
 miR3118 <- "UGUGACUGCAUUAUGAAAAUUCU"
-# Volcano plot for miR-23b. Feeling like a script kidde here
 layout <- c("pulldown", "control", "pulldown", "control", "pulldown", "control")
-design<-model.matrix(~0+layout)
-colnames(design)<-c("control","pulldown")
-# Columns 1,2,5,6,9,10 are miR-3118
-fit_3118<-lmFit(assayDat3118_4307$exprs[,c(1,2,5,6,9,10)], design)
-cont.matrix.3118 <- makeContrasts(PullDownvsControl=pulldown-control, 
-                                 levels=design)
-fit2_3118 <- contrasts.fit(fit_3118, cont.matrix.3118)
-fit2_3118 <- eBayes(fit2_3118)
-full_gene_list_3118<-topTable(fit2_3118, coef=1, number=1000000, sort.by="logFC")
-plot(full_gene_list_3118$logFC, -log10(full_gene_list_3118$P.Value), 
-     xlab="log2 fold change", ylab="-log10 p-value")
+cols.3118 <- c(1,2,5,6,9,10)
+full_gene_list_3118 <- measurelogFC(assayDat3118_4307, layout, cols.3118)
 
 miR4307 <- "AAUGUUUUUUCCUGUUUCC"
 # Columns 3,4,7,8,11,12 are miR-4307
-fit_4307<-lmFit(assayDat3118_4307$exprs[,c(3,4,7,8,11,12)], design)
-cont.matrix.4307 <- makeContrasts(PullDownvsControl=pulldown-control, 
-                                  levels=design)
-fit2_4307 <- contrasts.fit(fit_4307, cont.matrix.4307)
-fit2_4307 <- eBayes(fit2_4307)
-full_gene_list_4307<-topTable(fit2_4307, coef=1, number=1000000, sort.by="logFC")
-plot(full_gene_list_4307$logFC, -log10(full_gene_list_4307$P.Value), 
-     xlab="log2 fold change", ylab="-log10 p-value")
+cols.4307 <- c(3,4,7,8,11,12)
+full_gene_list_4307 <- measurelogFC(assayDat3118_4307, layout, cols.4307)
 
-targets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC > 1 
-                                  & full_gene_list_3118$P.Value < 0.05, ]
-# Is everything else really non-targets?
-# Not neccessarily. Use ones that barely showed up in the pull downs
-nontargets_3118 <- full_gene_list_3118[full_gene_list_3118$logFC < -1 
-                                    & full_gene_list_3118$P.Value < 0.05, ]
-# Get genbank accession numbers
-genbankAcc_3118 <- featDatTable3118_4307$`GenBank Accession`[
-  row.names(featDatTable3118_4307) %in% row.names(targets_3118)
-  ]
-genbankAcc_3118 <- c(genbankAcc_3118, featDatTable3118_4307$`GenBank Accession`[
-  row.names(featDatTable3118_4307) %in% row.names(nontargets_3118)])
-
-# Create a column for 1 being target and 0 being non target
-targetCol_3118 <- c(rep(1, nrow(targets_3118)), rep(0, nrow(nontargets_3118)))
-
-accToTarget_3118 <- cbind(genbankAcc_3118, targetCol_3118)
-# Removing repeats and RNA with no acc numbers
-accToTarget_3118 <- accToTarget_3118[accToTarget_3118[,1] != "", ]
-accToTarget_3118 <- dealWithRepAcc(accToTarget_3118)
-
+accToTarget_3118 <- accToTargMat(full_gene_list_3118, featDatTable3118_4307)
 mir3118_featMat <- createFeatureMatrix(miR3118, accToTarget_3118[,1], 
-                                      accToTarget_3118[,2])
+                                       accToTarget_3118[,2])
 
 # miR4307 targets and features
-targets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC > 1 
-                                    & -log10(full_gene_list_4307$P.Value) > -log10(0.05), ]
-# choose NOn targets that barely showed up in the pull downs
-nontargets_4307 <- full_gene_list_4307[full_gene_list_4307$logFC < -1 
-                                       & full_gene_list_4307$P.Value < 0.05, ]
-# Get genbank accession numbers
-genbankAcc_4307 <- featDatTable3118_4307$`GenBank Accession`[
-  row.names(featDatTable3118_4307) %in% row.names(targets_4307)
-  ]
-genbankAcc_4307 <- c(genbankAcc_4307, featDatTable3118_4307$`GenBank Accession`[
-  row.names(featDatTable3118_4307) %in% row.names(nontargets_4307)])
-
-# Create a column for 1 being target and 0 being non target
-targetCol_4307 <- c(rep(1, nrow(targets_4307)), rep(0, nrow(nontargets_4307)))
-
-accToTarget_4307 <- cbind(genbankAcc_4307, targetCol_4307)
-# Removing repeats and RNA with no acc numbers
-accToTarget_4307 <- accToTarget_4307[accToTarget_4307[,1] != "", ]
-accToTarget_4307 <- dealWithRepAcc(accToTarget_4307)
-
+accToTarget_4307 <- accToTargMat(full_gene_list_4307, featDatTable3118_4307)
 mir4307_featMat <- createFeatureMatrix(miR4307, accToTarget_4307[,1], 
                                        accToTarget_4307[,2])
 
-freeEngFeats_3118.1 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][1:100], mir3118_featMat[[1]][1:100,])
-freeEngFeats_3118.2 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][101:300], mir3118_featMat[[1]][101:300,])
-freeEngFeats_3118.3 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][301:600], mir3118_featMat[[1]][301:600,])
-freeEngFeats_3118.4 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][601:1000], mir3118_featMat[[1]][601:1000,])
-freeEngFeats_3118.5 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][1001:1500], mir3118_featMat[[1]][1001:1500,])
-freeEngFeats_3118.6 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][1501:2100], mir3118_featMat[[1]][1501:2100,])
-freeEngFeats_3118.7 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][2101:2800], mir3118_featMat[[1]][2101:2800,])
-freeEngFeats_3118.8 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][2801:3600], mir3118_featMat[[1]][2801:3600,])
-freeEngFeats_3118.9 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][3601:4500], mir3118_featMat[[1]][3601:4500,])
-freeEngFeats_3118.10 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][4501:5500], mir3118_featMat[[1]][4501:5500,])
-freeEngFeats_3118.11 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][5501:6500], mir3118_featMat[[1]][5501:6500,])
-freeEngFeats_3118.12 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][6501:7500], mir3118_featMat[[1]][6501:7500,])
-freeEngFeats_3118.13 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][7501:8500], mir3118_featMat[[1]][7501:8500,])
-freeEngFeats_3118.14 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][8501:9500], mir3118_featMat[[1]][8501:9500,])
-freeEngFeats_3118.15 <- siteDuplexFreeEnergy(
-  miR3118, mir3118_featMat[[2]][9501:length(mir3118_featMat[[2]])], 
-  mir3118_featMat[[1]][9501:length(mir3118_featMat[[2]]),])
+freeEngFeats_3118 <- siteDuplexFreeEnergy(
+  miR3118, mir3118_featMat[[2]], mir3118_featMat[[1]])
 
-freeEngFeats_3118 <- rbind(freeEngFeats_3118.1, freeEngFeats_3118.2, 
-                           freeEngFeats_3118.3, freeEngFeats_3118.4,
-                           freeEngFeats_3118.5, freeEngFeats_3118.6,
-                           freeEngFeats_3118.7, freeEngFeats_3118.8,
-                           freeEngFeats_3118.9, freeEngFeats_3118.10,
-                           freeEngFeats_3118.11, freeEngFeats_3118.12,
-                           freeEngFeats_3118.13, freeEngFeats_3118.14,
-                           freeEngFeats_3118.15)
-
-freeEngFeats_4307.1 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][1:1000], mir4307_featMat[[1]][1:1000,])
-freeEngFeats_4307.2 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][1001:2000], mir4307_featMat[[1]][1001:2000,])
-freeEngFeats_4307.3 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][2001:3000], mir4307_featMat[[1]][2001:3000,])
-freeEngFeats_4307.4 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][3001:4000], mir4307_featMat[[1]][3001:4000,])
-freeEngFeats_4307.5 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][4001:5000], mir4307_featMat[[1]][4001:5000,])
-freeEngFeats_4307.6 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][5001:6000], mir4307_featMat[[1]][5001:6000,])
-freeEngFeats_4307.7 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][6001:7000], mir4307_featMat[[1]][6001:7000,])
-freeEngFeats_4307.8 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][7001:8000], mir4307_featMat[[1]][7001:8000,])
-freeEngFeats_4307.9 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][8001:9000], mir4307_featMat[[1]][8001:9000,])
-freeEngFeats_4307.10 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][9001:10000], mir4307_featMat[[1]][9001:10000,])
-freeEngFeats_4307.11 <- siteDuplexFreeEnergy(
-  miR4307, mir4307_featMat[[2]][10001:length(mir4307_featMat[[2]])], 
-  mir4307_featMat[[1]][10001:length(mir4307_featMat[[2]]),])
-
-freeEngFeats_4307 <- rbind(freeEngFeats_4307.1, freeEngFeats_4307.2, 
-                           freeEngFeats_4307.3, freeEngFeats_4307.4,
-                           freeEngFeats_4307.5, freeEngFeats_4307.6,
-                           freeEngFeats_4307.7, freeEngFeats_4307.8,
-                           freeEngFeats_4307.9, freeEngFeats_4307.10,
-                           freeEngFeats_4307.11)
+freeEngFeats_4307 <- siteDuplexFreeEnergy(
+  miR4307, mir4307_featMat[[2]], mir4307_featMat[[1]])
 
 freeEngFeats_3118$GenBank.Accession <- names(mir3118_featMat[[2]])
 freeEngFeats_4307$GenBank.Accession <- names(mir4307_featMat[[2]])
@@ -407,3 +218,30 @@ featMatmir4307 <- convertMissingValues(featMatmir4307)
 fullFeatMat <- rbind(featMatmir23b, featMatmir27a, featMatmir3118, 
                      featMatmir4307)
 fullFeatMatNoAcc <- fullFeatMat[, !colnames(fullFeatMat) %in% c("GenBank.Accession")]
+
+# More data to test performance on miRNA not included in training set
+
+cloonan.199a.424 <- getGEO("GSE40406", GSEMatrix =TRUE, AnnotGPL=TRUE)
+featDat.199a.424 <- featureData(cloonan.199a.424$GSE40406_series_matrix.txt.gz)
+featDatTable.199a.424 <- fData(cloonan.199a.424$GSE40406_series_matrix.txt.gz)
+assayDat.199a.424 <- assayData(cloonan.199a.424$GSE40406_series_matrix.txt.gz)
+phenoDat.199a.424 <- phenoData(cloonan.199a.424$GSE40406_series_matrix.txt.gz)
+pDatTable.199a.424 <- pData(cloonan.199a.424$GSE40406_series_matrix.txt.gz)
+# check experiment design
+pDatTable.199a.424[, c("title", "pull-down:ch1", "transfection molecule:ch1", "data_processing")]
+
+layout.199a.424 <- c("pulldown", "pulldown", "pulldown","control","control","control")
+cols.199a <- 1:6
+fgl_199a <- measurelogFC(assayDat.199a.424, layout.199a.424, cols.199a)
+accToTarget.199a <- accToTargMat(fgl_199a, featDatTable.199a.424)
+miR199a3p <- "ACAGUAGUCUGCACAUUGGUUA"
+sites.rnaSeq.featMat.199a <- createFeatureMatrix(miR199a3p, accToTarget.199a[,1],
+                                                 accToTarget.199a[,2])
+freeEngFeats.199a <- siteDuplexFreeEnergy(
+  miR199a3p, sites.rnaSeq.featMat.199a[[2]], sites.rnaSeq.featMat.199a[[1]])
+freeEngFeats.199a$GenBank.Accession <- names(sites.rnaSeq.featMat.199a[[2]])
+featMat.199a <- merge(sites.rnaSeq.featMat.199a[[3]], freeEngFeats.199a,
+                      by = "GenBank.Accession")
+featMat.199a <- convertMissingValues(featMat.199a)
+featMat.199a.noAcc <- featMat.199a[
+  , !colnames(featMat.199a) %in% c("GenBank.Accession")]
