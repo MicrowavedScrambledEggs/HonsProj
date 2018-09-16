@@ -42,4 +42,14 @@ predStats.420 <- predictResults(predictions.420, testSet)
 # Test on miRNA not used in the training set
 predict.199a <- predict(miTargRF, featMat.199a)
 results.199a <- predictResults(predict.199a, featMat.199a)
+predict.199a.420 <- predict(miTargRF.420, featMat.199a)
+results.199a.420 <- predictResults(predict.199a.420, featMat.199a)
 
+# Retrain with feature set more general to all miRNA:mRNA pairs
+trainStart <- Sys.time()
+miTargRF.trimFeat <- randomForest(Target ~ ., data = trimTrainingSet)
+Sys.time() - trainStart
+predTrim <- predict(miTargRF.trimFeat, trimTestSet)
+trimResults <- predictResults(predTrim, trimTestSet)
+predTrim.199a <- predict(miTargRF.trimFeat, trim199aSet)
+trimResults.199a <- predictResults(predTrim.199a, trim199aSet)

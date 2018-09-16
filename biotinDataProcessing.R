@@ -4,9 +4,9 @@ source("CreateFeatureMatrix.R")
 
 cloonan23b27a <- getGEO("GSE40410", GSEMatrix =TRUE, AnnotGPL=TRUE)
 #comes up with a "13 parsing failures" warning
-featDat <- featureData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
-featDatTable <- fData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
-assayDat <- assayData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
+featDat.23b.27a <- featureData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
+featDatTable.23b.27a <- fData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
+assayDat.23b.27a <- assayData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 
 measurelogFC <- function(assayDat, layout, cols){
   design<-model.matrix(~0+layout)
@@ -17,7 +17,7 @@ measurelogFC <- function(assayDat, layout, cols){
   fit2 <- contrasts.fit(fit, cont.matrix)
   fit2 <- eBayes(fit2)
   full_gene_list<-topTable(fit2, coef=1, number=1000000, sort.by="logFC")
-  plot(full_gene_list_3118$logFC, -log10(full_gene_list_3118$P.Value), 
+  plot(full_gene_list$logFC, -log10(full_gene_list$P.Value), 
        xlab="log2 fold change", ylab="-log10 p-value")
   return(full_gene_list)
 }
@@ -25,7 +25,7 @@ measurelogFC <- function(assayDat, layout, cols){
 miR23b <- "AUCACAUUGCCAGGGAUUACC"
 # Volcano plot for miR-23b.
 layout <- c("pulldown", "control", "pulldown", "control")
-full_gene_list_23b <- measurelogFC(assayDat, layout, 1:4)
+full_gene_list_23b <- measurelogFC(assayDat.23b.27a, layout, 1:4)
 
 accToTargMat <- function(full_gene_list, featDatTable){
   # targets defined as below log2FoldChange threshold 1 and 
@@ -33,7 +33,7 @@ accToTargMat <- function(full_gene_list, featDatTable){
   # This is to ensure statistically significant targets that showed up at least
   # twice as much in the pull down compared to the control
   targets <- full_gene_list[full_gene_list$logFC > 1 
-                            & -log10(full_gene_list$P.Value) > -log10(0.05), ]
+                            & full_gene_list$P.Value < 0.05, ]
   # choose NOn targets that barely showed up in the pull downs
   nontargets <- full_gene_list[full_gene_list$logFC < -1 
                                & full_gene_list$P.Value < 0.05, ]
@@ -70,8 +70,7 @@ dealWithRepAcc <- function(accToTarget){
   return(accToTarget)
 }
 
-accToTarget_23b <- accToTargMat(full_gene_list_23b, featDatTable)
-accToTarget_23b <- dealWithRepAcc(accToTarget_23b)
+accToTarget_23b <- accToTargMat(full_gene_list_23b, featDatTable.23b.27a)
 
 mir23b_featMat <- createFeatureMatrix(miR23b, accToTarget_23b[,1], 
                                       accToTarget_23b[,2])
@@ -81,8 +80,8 @@ freeEngFeats_23b <- siteDuplexFreeEnergy(
 # Processing miR27a data
 miR27a <- "UUCACAGUGGCUAAGUUCCGC"
 # Columns 5:8 are miR27a
-full_gene_list_27a <- measurelogFC(assayDat, layout, 5:8)
-accToTarget_27a <- accToTargMat(full_gene_list_27a, featDatTable)
+full_gene_list_27a <- measurelogFC(assayDat.23b.27a, layout, 5:8)
+accToTarget_27a <- accToTargMat(full_gene_list_27a, featDatTable.23b.27a)
 
 mir27a_featMat <- createFeatureMatrix(miR27a, accToTarget_27a[,1], 
                                       accToTarget_27a[,2])
@@ -165,7 +164,7 @@ convertMissingValues <- function(featMat){
   # Make sure categorical features have all factor levels
   miIdenCols <- colnames(featMat)[grepl("mi\\d", colnames(featMat))]
   for(colu in miIdenCols)
-    levels(featMat[,colu]) <- c("A", "C", "G", "T", "X")
+    featMat[,colu] <- factor(featMat[,colu], levels = c("A", "C", "G", "T", "X"))
   
   return(featMat)
 }
@@ -208,10 +207,10 @@ freeEngFeats_4307 <- siteDuplexFreeEnergy(
 freeEngFeats_3118$GenBank.Accession <- names(mir3118_featMat[[2]])
 freeEngFeats_4307$GenBank.Accession <- names(mir4307_featMat[[2]])
 
-featMatmir3118 <- merge(mir3118_matrix, freeEngFeats_3118, 
+featMatmir3118 <- merge(mir3118_featMat[[3]], freeEngFeats_3118, 
                         by = "GenBank.Accession")
 featMatmir3118 <- convertMissingValues(featMatmir3118)
-featMatmir4307 <- merge(mir4307_matrix, freeEngFeats_4307, 
+featMatmir4307 <- merge(mir4307_featMat[[3]], freeEngFeats_4307, 
                         by = "GenBank.Accession")
 featMatmir4307 <- convertMissingValues(featMatmir4307)
 
