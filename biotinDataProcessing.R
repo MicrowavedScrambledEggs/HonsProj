@@ -244,3 +244,21 @@ featMat.199a <- merge(sites.rnaSeq.featMat.199a[[3]], freeEngFeats.199a,
 featMat.199a <- convertMissingValues(featMat.199a)
 featMat.199a.noAcc <- featMat.199a[
   , !colnames(featMat.199a) %in% c("GenBank.Accession")]
+
+cols.424 <- 7:12
+fgl_424 <- measurelogFC(assayDat.199a.424, layout.199a.424, cols.424)
+accToTarget.424 <- accToTargMat(fgl_424, featDatTable.199a.424)
+miR424.3p <- "CAAAACGUGAGGCGCUGCUAU"
+sites.rnaSeq.featMat.424 <- createFeatureMatrix(miR424.3p, accToTarget.424[,1],
+                                                 accToTarget.424[,2])
+freeEngFeats.424 <- siteDuplexFreeEnergy(
+  miR424.3p, sites.rnaSeq.featMat.424[[2]], sites.rnaSeq.featMat.424[[1]])
+freeEngFeats.424$GenBank.Accession <- names(sites.rnaSeq.featMat.424[[2]])
+featMat.424 <- merge(sites.rnaSeq.featMat.424[[3]], freeEngFeats.424,
+                      by = "GenBank.Accession")
+featMat.424 <- convertMissingValues(featMat.424)
+
+# RAW DATA
+
+
+

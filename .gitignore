@@ -7,3 +7,4 @@
 *.seq
 .RDataTmp
 *.out
+/Data/*
