@@ -9,9 +9,12 @@ featDatTable.23b.27a <- fData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 assayDat.23b.27a <- assayData(cloonan23b27a$GSE40410_series_matrix.txt.gz)
 
 measurelogFC <- function(assayDat, layout, cols){
+  if(class(assayDat) == "environment"){
+    assayDat <- assayDat$exprs
+  }
   design<-model.matrix(~0+layout)
   colnames(design)<-c("control","pulldown")
-  fit<-lmFit(assayDat$exprs[,cols], design)
+  fit<-lmFit(assayDat[,cols], design)
   cont.matrix <- makeContrasts(PullDownvsControl=pulldown-control, 
                                levels=design)
   fit2 <- contrasts.fit(fit, cont.matrix)
@@ -43,6 +46,34 @@ accToTargMat <- function(full_gene_list, featDatTable){
     ]
   genbankAcc <- c(genbankAcc, featDatTable$`GenBank Accession`[
     row.names(featDatTable) %in% row.names(nontargets)])
+  
+  # Create a column for 1 being target and 0 being non target
+  targetCol <- c(rep(1, nrow(targets)), rep(0, nrow(nontargets)))
+  
+  accToTarget <- cbind(genbankAcc, targetCol)
+  # Removing repeats and RNA with no acc numbers
+  accToTarget <- accToTarget[accToTarget[,1] != "", ]
+  accToTarget <- dealWithRepAcc(accToTarget)
+  return(accToTarget)
+}
+
+accToTargMatRAW <- function(full_gene_list){
+  # targets defined as below log2FoldChange threshold 1 and 
+  # below p-value threshold of 0.05
+  # This is to ensure statistically significant targets that showed up at least
+  # twice as much in the pull down compared to the control
+  targets <- full_gene_list[full_gene_list$logFC > 1 
+                            & full_gene_list$P.Value < 0.05, ]
+  # choose NOn targets that barely showed up in the pull downs
+  nontargets <- full_gene_list[full_gene_list$logFC < -1 
+                               & full_gene_list$P.Value < 0.05, ]
+  # Get genbank accession numbers
+  genbankAcc <- full_gene_list$SEARCH_KEY[
+    row.names(full_gene_list) %in% row.names(targets)
+  ]
+  genbankAcc <- c(genbankAcc, full_gene_list$SEARCH_KEY[
+    row.names(full_gene_list) %in% row.names(nontargets)
+  ])
   
   # Create a column for 1 being target and 0 being non target
   targetCol <- c(rep(1, nrow(targets)), rep(0, nrow(nontargets)))
@@ -258,7 +289,51 @@ featMat.424 <- merge(sites.rnaSeq.featMat.424[[3]], freeEngFeats.424,
                       by = "GenBank.Accession")
 featMat.424 <- convertMissingValues(featMat.424)
 
+# miR-96
+geo.96 <- getGEO("GSE117103", GSEMatrix =TRUE, AnnotGPL=TRUE)
+featDat.96 <- featureData(geo.96$GSE117103_series_matrix.txt.gz)
+featDatTable.96 <- fData(geo.96$GSE117103_series_matrix.txt.gz)
+assayDat.96 <- assayData(geo.96$GSE117103_series_matrix.txt.gz)
+phenoDat.96 <- phenoData(geo.96$GSE117103_series_matrix.txt.gz)
+pDatTable.96 <- pData(geo.96$GSE117103_series_matrix.txt.gz)
+# Note these were trasfected with 30nM
+
+layout.96 <- c("pulldown", "control", "pulldown", "control", "pulldown", "control")
+cols.96 <- c(2,4,6,8,10,12)
+fgl.96 <- measurelogFC(assayDat.96, layout.96, cols.96)
+# That is a weird volcano plot
+
+
 # RAW DATA
+# miR 30e and miR 4536
+# miR-4536
+dat.dir <- "Data/30e-4536/"
+CAKI.4536.array.labels <- readTargets(file = paste0(dat.dir,"Targets_CAKI_4536.txt"))
+CAKI.4536.all.data<-read.ilmn(
+  files=paste0(dat.dir, "sample_CAKI_4536.txt"), annotation = c("SEARCH_KEY", "SYMBOL"),
+  ctrlfiles=paste0(dat.dir, "control_CAKI_4536.txt"),probeid="PROBE_ID", 
+  other.columns="Detection", sep="\t", verbose=TRUE
+)
+#examine the array controls
+boxplot(CAKI.4536.all.data$E~CAKI.4536.all.data$genes$Status, log="y", las=2)
+#background correct and normalize, using the ERCC genes as the negative control
+y.4536 <- neqc(CAKI.4536.all.data, negctrl="ERCC")
+expressed <- rowSums(y.4536$other$Detection < 0.05) >= 3
+y.4536 <- y.4536[expressed,]
+plotMDS(y.4536, labels = CAKI.4536.array.labels$Type)
+plotMDS(y.4536, labels = CAKI.4536.array.labels$Sample.Group)
+# control sample A doesn't look right
+plotMDS(y.4536[,-1], labels = CAKI.4536.array.labels$Type[-1])
+plotMDS(y.4536[,-1], labels = CAKI.4536.array.labels$Sample.Group[-1])
+
+layout.CAKI.4536 <- CAKI.4536.array.labels$Type[-1]
+cols.CAKI.4536 <- (2:6)
+fgl.CAKI.4536 <- measurelogFC(y.4536, layout.CAKI.4536, cols.CAKI.4536) 
+accToTarg.4536 <- accToTargMatRAW(fgl.CAKI.4536)
+table(accToTarg.4536[,2])
+# High target to non-target ratio. Should I use all targets when training?
+
+
 
 
 
