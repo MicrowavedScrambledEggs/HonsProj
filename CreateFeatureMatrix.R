@@ -15,7 +15,7 @@ if(grepl("H:/", getwd())) vRNADir <- '"C:/Users/bjam575/AppData/Local/ViennaRNA 
 
 # Read in already downloaded sequences and annotations so we don't have
 # to query dbs every time
-accSeqRegions <- read.csv("accSeqRegions.csv")
+# accSeqRegions <- read.csv("accSeqRegions.csv")
 
 
 querymRNASequence <- function(accNos){
@@ -314,6 +314,7 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   cat("Looking up mRNA sequences and annotations\n")
   # Collect sequences and CDS start-stop for the accession numbers we have 
   # predownloaded sequences for
+  accSeqRegions <- read.csv("accSeqRegions.csv")
   seqAndCDS <- accSeqRegions[
     accSeqRegions$GenBank.Accession %in% acc, ]
   
@@ -536,14 +537,16 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
   }
   write(seqFileString, "siteSeqs.seq")
   writeTime <- Sys.time()
-  cat("Writing Time: ", writeTime - startTime, "\n")
+  cat("Writing Time: ", "\n")
+  print(writeTime - startTime)
 
   # Running RNAup on the file
   shell(
     paste0(vRNADir, 'RNAup.exe" -b --no_output_file < siteSeqs.seq > RNAupOUT.out'),
     intern = TRUE)
   rnaUPTime <- Sys.time()
-  cat("RNAup time: ", rnaUPTime - writeTime, "\n")
+  cat("RNAup time: ", "\n")
+  print(rnaUPTime - writeTime)
   rnaUpOutput <- strsplit(
     readChar("RNAupOUT.out", file.info("RNAupOUT.out")$size), "\n")[[1]]
   rnaUpOutEng <- rnaUpOutput[seq(3, length(rnaUpOutput), 3)]
@@ -552,8 +555,9 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
   freeEngStr <- gsub("= ", "", freeEngStr)
   freeEng <- as.numeric(freeEngStr)
   readTime <- Sys.time()
-  cat("Read Time: ", readTime - rnaUPTime, "\n")
-
+  cat("Read Time: ","\n")
+  print(readTime - rnaUPTime)
+  
   # Creating the features
   if(length(freeEng) != length(siteFromRNA)){
     cat("DUNDUNDUN!!!!\n")
@@ -583,7 +587,8 @@ siteDuplexFreeEnergy <- function(miRNA, mRNAStrings, siteEnds)
     output <- rbind(output, allFeats)
   }
   featTime <- Sys.time()
-  cat("Feature Creation time: ", featTime - readTime, "\n")
+  cat("Feature Creation time: ", "\n")
+  print(featTime - readTime)
   return(output)
 }
 

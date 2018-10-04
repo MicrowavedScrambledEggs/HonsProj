@@ -310,30 +310,191 @@ fgl.96 <- measurelogFC(assayDat.96, layout.96, cols.96)
 dat.dir <- "Data/30e-4536/"
 CAKI.4536.array.labels <- readTargets(file = paste0(dat.dir,"Targets_CAKI_4536.txt"))
 CAKI.4536.all.data<-read.ilmn(
-  files=paste0(dat.dir, "sample_CAKI_4536.txt"), annotation = c("SEARCH_KEY", "SYMBOL"),
+  files=paste0(dat.dir, "sample_CAKI_4536.txt"), 
+  annotation = c("TargetID", "SEARCH_KEY", "SYMBOL"),
   ctrlfiles=paste0(dat.dir, "control_CAKI_4536.txt"),probeid="PROBE_ID", 
   other.columns="Detection", sep="\t", verbose=TRUE
 )
 #examine the array controls
 boxplot(CAKI.4536.all.data$E~CAKI.4536.all.data$genes$Status, log="y", las=2)
+
+boxplot(log2(CAKI.4536.all.data$E), range=0, ylab="log 2 intensity", las=2)
 #background correct and normalize, using the ERCC genes as the negative control
 y.4536 <- neqc(CAKI.4536.all.data, negctrl="ERCC")
-expressed <- rowSums(y.4536$other$Detection < 0.05) >= 3
+# Remove probes not expressed in at least 3 arrays
+# (as 3 is the size of the pulldown/control groups of arrays)
+expressed <- rowSums(y.4536$other$Detection < 0.05) >= 2
 y.4536 <- y.4536[expressed,]
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Type)
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Sample.Group)
 # control sample A doesn't look right
-plotMDS(y.4536[,-1], labels = CAKI.4536.array.labels$Type[-1])
-plotMDS(y.4536[,-1], labels = CAKI.4536.array.labels$Sample.Group[-1])
+# recorrect without the bad sample A controls
+y.4536 <- neqc(CAKI.4536.all.data[,-1], negctrl = "ERCC")
+plotMDS(y.4536, labels = CAKI.4536.array.labels$Type[-1])
+plotMDS(y.4536, labels = CAKI.4536.array.labels$Sample.Group[-1])
+# Reremove probes not expressed in at least 2 arrays
+# (as 2 is the smallest size of the pulldown/control groups of arrays)
+expressed <- rowSums(y.4536$other$Detection < 0.05) >= 2
+y.4536 <- y.4536[expressed,]
 
 layout.CAKI.4536 <- CAKI.4536.array.labels$Type[-1]
-cols.CAKI.4536 <- (2:6)
+cols.CAKI.4536 <- (1:5)
 fgl.CAKI.4536 <- measurelogFC(y.4536, layout.CAKI.4536, cols.CAKI.4536) 
 accToTarg.4536 <- accToTargMatRAW(fgl.CAKI.4536)
 table(accToTarg.4536[,2])
 # High target to non-target ratio. Should I use all targets when training?
 
+#5p
+miR4536.5p <- "UGUGGUAGAUAUAUGCACGAU"
+sites.rnaSeq.featMat.4536 <- createFeatureMatrix(miR4536.5p, accToTarg.4536[,1],
+                                                accToTarg.4536[,2])
+freeEngFeats.4536 <- siteDuplexFreeEnergy(
+  miR4536.5p, sites.rnaSeq.featMat.4536[[2]], sites.rnaSeq.featMat.4536[[1]])
+freeEngFeats.4536$GenBank.Accession <- names(sites.rnaSeq.featMat.4536[[2]])
+featMat.4536 <- merge(sites.rnaSeq.featMat.4536[[3]], freeEngFeats.4536,
+                     by = "GenBank.Accession")
+featMat.4536 <- convertMissingValues(featMat.4536)
 
+# miR-30e
+SKOV1.30e.array.labels <- readTargets(file = paste0(dat.dir,"Targets_RNA_DNA_30e.txt"))
+SKOV1.30e.all.data<-read.ilmn(
+  files=paste0(dat.dir, "sample_RNA_DNA_30e.txt"), 
+  annotation = c("TargetID", "SEARCH_KEY", "SYMBOL"),
+  ctrlfiles=paste0(dat.dir, "control_RNA_DNA_30e.txt"),probeid="PROBE_ID", 
+  other.columns="Detection", sep="\t", verbose=TRUE
+)
+boxplot(log2(y.30e$E),range=0,ylab="log2 intensity", las=2)
+#examine the array controls
+boxplot(SKOV1.30e.all.data$E~SKOV1.30e.all.data$genes$Status, log="y", las=2)
+#background correct and normalize, using the ERCC genes as the negative control
+y.30e <- neqc(SKOV1.30e.all.data, negctrl="ERCC")
+# Reremove probes not expressed in at least 4 arrays
+# (as 4 is the smallest size of the pulldown/control groups of arrays)
+expressed <- rowSums(y.30e$other$Detection < 0.05) >= 4
+y.30e <- y.30e[expressed,]
+plotMDS(y.30e, labels = SKOV1.30e.array.labels$Type)
+plotMDS(y.30e, labels = SKOV1.30e.array.labels$Sample.Group)
+plotMDS(y.30e, labels = SKOV1.30e.array.labels$Molecule)
 
+layout.SKOV1.30e <- SKOV1.30e.array.labels$Type
+cols.SKOV1.30e <- 1:10
+fgl.SKOV1.30e <- measurelogFC(y.30e, layout.SKOV1.30e, cols.SKOV1.30e) 
+accToTarg.30e <- accToTargMatRAW(fgl.SKOV1.30e)
+table(accToTarg.30e[,2])
+# Also large amount of targets to non targets,
+
+# miR-155-5p and miR-584-5p
+dat.dir <- "Data/miRs-155-584_SKOV3_PANC1/"
+array.labels.155.584 <- readTargets(file = paste0(dat.dir,"Targets.txt"))
+all.data.155.584<-read.ilmn(
+  files=paste0(dat.dir, "june_sample_probe_profile.txt"), 
+  annotation = c("TargetID", "SEARCH_KEY", "SYMBOL"),
+  ctrlfiles=paste0(dat.dir, "june_control_probe_profile.txt"),probeid="PROBE_ID", 
+  other.columns="Detection", sep="\t", verbose=TRUE
+)
+boxplot(all.data.155.584$E~all.data.155.584$genes$Status, las=2)
+boxplot(log2(all.data.155.584$E),range=0,ylab="log2 intensity", las=2)
+y.155.584 <- neqc(all.data.155.584, negctrl = "NEGATIVE")
+boxplot(log2(y.155.584$E),range=0,ylab="log2 intensity", las=2)
+plotMDS(y.155.584, labels = array.labels.155.584$Type)
+pancCols.155 <- c(4,5,6,10,11,12)
+skovCols.155 <- c(1,2,3,7,8,9)
+pancCols.584 <- c(16,17,18,22,23,24)
+skovCols.584 <- c(13,14,15,19,20,21)
+# look at panc cell type
+plotMDS(y.155.584[,c(pancCols.584, pancCols.155)], 
+        labels = array.labels.155.584$Type[c(pancCols.584, pancCols.155)])
+# Ooh a dodgy pull down
+plotMDS(y.155.584[,c(pancCols.584, pancCols.155)], 
+        labels = array.labels.155.584$Sample.Group[c(pancCols.584, pancCols.155)])
+# 200162410075_L is dodgy (col 24)
+pancCols.584 <- c(16,17,18,22,23)
+plotMDS(y.155.584[,c(pancCols.584, pancCols.155)], 
+        labels = array.labels.155.584$Type[c(pancCols.584, pancCols.155)])
+# look at panc 155
+plotMDS(y.155.584[,c(pancCols.155)], 
+        labels = array.labels.155.584$Sample.Group[c(pancCols.155)])
+plotMDS(y.155.584[,c(pancCols.155)], 
+        labels = array.labels.155.584$Type[c(pancCols.155)])
+# Controls clustering to gether so probably legit
+
+# look at panc 584
+plotMDS(y.155.584[,c(pancCols.584)], 
+        labels = array.labels.155.584$Sample.Group[c(pancCols.584)])
+plotMDS(y.155.584[,c(pancCols.584)], 
+        labels = array.labels.155.584$Type[c(pancCols.584)])
+# hmm me no likey
+
+# look at skov
+plotMDS(y.155.584[,c(skovCols.584, skovCols.155)], 
+        labels = array.labels.155.584$Type[c(skovCols.584, skovCols.155)])
+# 200162410075_G is dodgy (col 19). Though is it...? Maybe 75_H is cos it's on Controls
+skovCols.584 <- c(13,14,15,19,21)
+plotMDS(y.155.584[,c(skovCols.584, skovCols.155)], 
+        labels = array.labels.155.584$miRNA[c(skovCols.584, skovCols.155)])
+# look at skov 155
+plotMDS(y.155.584[,c(skovCols.155)], 
+        labels = array.labels.155.584$Type[c(skovCols.155)])
+# hmmm ... Maybe try without I and C
+plotMDS(y.155.584[,c(1,2,7,8)], 
+        labels = array.labels.155.584$Type[c(1,2,7,8)])
+# look at skov 584
+plotMDS(y.155.584[,c(skovCols.584)], 
+        labels = array.labels.155.584$Type[c(skovCols.584)])
+skovCols.155 <- c(1,2,7,8)
+
+# Use SKOV arrays
+# exclude probes not expressed (pvalue >0.05) in at least 4 (num pulldowns) arrays
+# 4 is the smallest size of the pulldown/control groups of arrays
+expressed <- rowSums(
+  y.155.584$other$Detection[,c(skovCols.155, skovCols.584)] < 0.05) >= 4
+y.155.584 <- y.155.584[expressed,]
+# miR155
+layout.155 <- array.labels.155.584$Type[skovCols.155]
+fgl.155 <- measurelogFC(y.155.584, layout.155, skovCols.155)
+accToTarg.155 <- accToTargMatRAW(fgl.155)
+table(accToTarg.155[,2])
+# small sample!
+
+# miR-584
+layout.584 <- array.labels.155.584$Type[skovCols.584]
+fgl.584 <- measurelogFC(y.155.584, layout.584, skovCols.584)
+accToTarg.584 <- accToTargMatRAW(fgl.584)
+table(accToTarg.584[,2])
+# relatively ballanced for once
+
+# Get features!
+
+# Could not find which arm the 30e biotinylated sequence is from
+# 5p is the dominant one according to: 
+#   http://www.mirbase.org/cgi-bin/mirna_entry.pl?acc=MI0000749
+# so I'll use that for now
+miR30e.5p <- "UGUAAACAUCCUUGACUGGAAG"
+s.rS.fM.30e <- createFeatureMatrix(miR30e.5p, accToTarg.30e[,1], 
+                                   accToTarg.30e[,2])
+freeEngFeats.30e <- siteDuplexFreeEnergy(miR30e.5p, s.rS.fM.30e[[2]],
+                                         s.rS.fM.30e[[1]])
+freeEngFeats.30e$GenBank.Accession <- names(s.rS.fM.30e[[2]])
+featMat.30e <- merge(s.rS.fM.30e[[3]], freeEngFeats.30e, by = "GenBank.Accession")
+# There were two targets where no binding sites were found
+# So maybe the 30e used was from the 3p branch?
+
+# 155 feats
+miR155.5p <- "UUAAUGCUAAUCGUGAUAGGGGUU"
+s.rS.fM.155 <- createFeatureMatrix(miR155.5p, accToTarg.155[,1], 
+                                   accToTarg.155[,2])
+freeEngFeats.155 <- siteDuplexFreeEnergy(miR155.5p, s.rS.fM.155[[2]],
+                                         s.rS.fM.155[[1]])
+freeEngFeats.155$GenBank.Accession <- names(s.rS.fM.155[[2]])
+featMat.155 <- merge(s.rS.fM.155[[3]], freeEngFeats.155, by = "GenBank.Accession")
+
+# 584 feats
+miR584.5p <- "UUAUGGUUUGCCUGGGACUGAG"
+s.rS.fM.584 <- createFeatureMatrix(miR584.5p, accToTarg.584[,1], 
+                                   accToTarg.584[,2])
+freeEngFeats.584 <- siteDuplexFreeEnergy(miR584.5p, s.rS.fM.584[[2]],
+                                          s.rS.fM.584[[1]])
+freeEngFeats.584$GenBank.Accession <- names(s.rS.fM.584[[2]])
+featMat.584 <- merge(s.rS.fM.584[[3]], freeEngFeats.584, by = "GenBank.Accession")
 
 
