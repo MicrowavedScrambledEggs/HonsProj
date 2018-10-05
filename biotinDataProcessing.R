@@ -487,6 +487,7 @@ freeEngFeats.155 <- siteDuplexFreeEnergy(miR155.5p, s.rS.fM.155[[2]],
                                          s.rS.fM.155[[1]])
 freeEngFeats.155$GenBank.Accession <- names(s.rS.fM.155[[2]])
 featMat.155 <- merge(s.rS.fM.155[[3]], freeEngFeats.155, by = "GenBank.Accession")
+featMat.155 <- convertMissingValues(featMat.155)
 
 # 584 feats
 miR584.5p <- "UUAUGGUUUGCCUGGGACUGAG"
@@ -496,5 +497,80 @@ freeEngFeats.584 <- siteDuplexFreeEnergy(miR584.5p, s.rS.fM.584[[2]],
                                           s.rS.fM.584[[1]])
 freeEngFeats.584$GenBank.Accession <- names(s.rS.fM.584[[2]])
 featMat.584 <- merge(s.rS.fM.584[[3]], freeEngFeats.584, by = "GenBank.Accession")
+featMat.584 <- convertMissingValues(featMat.584)
 
+# miR-548d & miR-1289
+dat.dir <- "Data/548d-1289/"
+array.labels.548d.1289 <- readTargets(file = paste0(dat.dir,"Targets.txt"))
+all.data.548d.1289<-read.ilmn(
+  files=paste0(dat.dir, "sample probe profile.txt"), 
+  annotation = c("TargetID", "SEARCH_KEY", "SYMBOL"),
+  ctrlfiles=paste0(dat.dir, "control probe profile.txt"),probeid="PROBE_ID", 
+  other.columns="Detection", sep="\t", verbose=TRUE
+)
+boxplot(all.data.548d.1289$E~all.data.548d.1289$genes$Status, las=2)
+boxplot(log2(all.data.548d.1289$E)~all.data.548d.1289$genes$Status, las=2)
+# A fair bit of exrpession in the negative controls at the levels at which 
+# the bulk of the regular genes are expressed
+# normalise with ERCC instead
+y.548d.1289 <- neqc(all.data.548d.1289, negctrl = "ERCC")
+boxplot(log2(y.548d.1289$E), las = 2)
 
+# Check MDS plots
+skovCols.548d <- 1:6
+cakiCols.548d <- 7:12
+skovCols.1289 <- 13:18
+cakiCols.1289 <- 19:24
+plotMDS(y.548d.1289, labels = array.labels.548d.1289$Type)
+plotMDS(y.548d.1289[,skovCols.548d], 
+        labels = array.labels.548d.1289$Type[skovCols.548d])
+plotMDS(y.548d.1289[,cakiCols.548d], 
+        labels = array.labels.548d.1289$Type[cakiCols.548d])
+plotMDS(y.548d.1289[,skovCols.1289], 
+        labels = array.labels.548d.1289$Type[skovCols.1289])
+plotMDS(y.548d.1289[,cakiCols.1289], 
+        labels = array.labels.548d.1289$Type[cakiCols.1289])
+# So beautiful :')
+
+layout.548d.skov <- array.labels.548d.1289$Type[skovCols.548d]
+fgl.548d.skov <- measurelogFC(y.548d.1289, layout.548d.skov, skovCols.548d)
+accToTarg.548d.skov <- accToTargMatRAW(fgl.548d.skov)
+table(accToTarg.548d.skov[,2])
+# That's alotta data!
+# Wait whoops forgot to filter out lowly expressed genes
+expressed <- rowSums(y.548d.1289$other$Detection[,skovCols.548d] < 0.05) >= 3
+y.548d.skov <- y.548d.1289[expressed,skovCols.548d]
+fgl.548d.skov <- measurelogFC(y.548d.skov, layout.548d.skov, 1:6)
+accToTarg.548d.skov <- accToTargMatRAW(fgl.548d.skov)
+table(accToTarg.548d.skov[,2])
+# ah didn't change number of targets and non-targets anyway
+
+# Filter out lowly expressed genes for 1289
+expressed <- rowSums(y.548d.1289$other$Detection[,skovCols.1289] < 0.05) >= 3
+y.1289.skov <- y.548d.1289[expressed, skovCols.1289]
+
+layout.1289.skov <- array.labels.548d.1289$Type[skovCols.1289]
+fgl.1289.skov <- measurelogFC(y.1289.skov, layout.1289.skov, 1:6)
+accToTarg.1289.skov <- accToTargMatRAW(fgl.1289.skov)
+table(accToTarg.1289.skov[,2])
+#nice
+
+# miR-548d feats
+miR548d.3p <- "CAAAAACCACAGUUUCUUUUGC" 
+s.rS.fM.548d <- createFeatureMatrix(miR548d.3p, accToTarg.548d.skov[,1],
+                                    accToTarg.548d.skov[,2])
+fEF.548d <- siteDuplexFreeEnergy(miR548d.3p, s.rS.fM.548d[[2]],
+                                 s.rS.fM.548d[[1]])
+fEF.548d$GenBank.Accession <- names(s.rS.fM.548d[[2]])
+featMat.548d <- merge(s.rS.fM.548d[[3]], fEF.548d, by = "GenBank.Accession")
+featMat.548d <- convertMissingValues(featMat.548d)
+
+# miR-1289 feats
+miR1289 <- "UGGAGUCCAGGAAUCUGCAUUUU"
+s.rS.fM.1289 <- createFeatureMatrix(miR1289, accToTarg.1289.skov[,1],
+                                    accToTarg.1289.skov[,2])
+fEF.1289 <- siteDuplexFreeEnergy(miR1289, s.rS.fM.1289[[2]],
+                                 s.rS.fM.1289[[1]])
+fEF.1289$GenBank.Accession <- names(s.rS.fM.1289[[2]])
+featMat.1289 <- merge(s.rS.fM.1289[[3]], fEF.1289, by = "GenBank.Accession")
+featMat.1289 <- convertMissingValues(featMat.1289)

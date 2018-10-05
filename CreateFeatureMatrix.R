@@ -213,49 +213,51 @@ sitesOfClass <- function(classSearch, nameOfClass, rnaSet, rnaCDS,
   siteIndex <- siteIndex[siteIndex != 0]
   nucFreqMat <- matrix(NaN, nrow = length(rnaSet), ncol = nucWin*4)
   
-  for(i in 1:length(rnaSet)){
-    classEnd <- c()
-    classCount <- 0
-    for(j in 1:length(classMatches)){
-      if(!is.null(classEnds[[i, j]])) classEnd <- c(classEnd, classEnds[[i, j]])
-      classCount <- classCount + classCounts[i,j]
+  if(length(classSearch) > 0){
+    for(i in 1:length(rnaSet)){
+      classEnd <- c()
+      classCount <- 0
+      for(j in 1:length(classMatches)){
+        if(!is.null(classEnds[[i, j]])) classEnd <- c(classEnd, classEnds[[i, j]])
+        classCount <- classCount + classCounts[i,j]
+      }
+      if(classCount > 0) {
+        cdsStart <- rnaCDS$CDS.Start[[i]]
+        cdsStop <- rnaCDS$CDS.Stop[[i]]
+        allClassCounts[i] <- classCount
+        allClassEnds[[i]] <- classEnd
+        distFrom3 <- length(rnaSet[[i]]) - classEnd
+        meanDistFrom3[i] <- mean(distFrom3)
+        varDistFrom3[i] <- var(distFrom3)
+        medianDistFrom3[i] <- median(distFrom3)
+        
+        nucFreqMat[i,] <- nucFreqAroundSites(rnaSet[[i]], classEnd)
+        
+        if(!is.na(cdsStop)){
+          distFromStop <- cdsStop - classEnd
+          meanDistFromStop[i] <- mean(distFromStop)
+          varDistFromStop[i] <- var(distFromStop)
+          medianDistFromStop[i] <- median(distFromStop)
+          freqIn5[i] <- length(which(classEnd < cdsStart)) / length(classEnd)
+          freqInCDS[i] <- length(which(classEnd >= cdsStart 
+                                       & classEnd <= cdsStop)) / length(classEnd)
+          freqIn3[i] <- length(which(classEnd > cdsStop)) / length(classEnd)
+        } else { # Non coding RNA
+          meanDistFromStop[i] <- NA
+          varDistFromStop[i] <- NA
+          medianDistFromStop[i] <- NA
+          freqIn5[i] <- NA
+          freqInCDS[i] <- NA
+          freqIn3[i] <- NA
+        }
+        
+        if(!is.null(centeredClass)){
+          freqStart3[i] <- sum(classCounts[i, which(centeredClass == 3)]) / classCount
+          freqStart4[i] <- sum(classCounts[i, which(centeredClass == 4)]) / classCount
+          freqStart5[i] <- sum(classCounts[i, which(centeredClass == 5)]) / classCount
+        }
+      } 
     }
-    if(classCount > 0) {
-      cdsStart <- rnaCDS$CDS.Start[[i]]
-      cdsStop <- rnaCDS$CDS.Stop[[i]]
-      allClassCounts[i] <- classCount
-      allClassEnds[[i]] <- classEnd
-      distFrom3 <- length(rnaSet[[i]]) - classEnd
-      meanDistFrom3[i] <- mean(distFrom3)
-      varDistFrom3[i] <- var(distFrom3)
-      medianDistFrom3[i] <- median(distFrom3)
-      
-      nucFreqMat[i,] <- nucFreqAroundSites(rnaSet[[i]], classEnd)
-      
-      if(!is.na(cdsStop)){
-        distFromStop <- cdsStop - classEnd
-        meanDistFromStop[i] <- mean(distFromStop)
-        varDistFromStop[i] <- var(distFromStop)
-        medianDistFromStop[i] <- median(distFromStop)
-        freqIn5[i] <- length(which(classEnd < cdsStart)) / length(classEnd)
-        freqInCDS[i] <- length(which(classEnd >= cdsStart 
-                                     & classEnd <= cdsStop)) / length(classEnd)
-        freqIn3[i] <- length(which(classEnd > cdsStop)) / length(classEnd)
-      } else { # Non coding RNA
-        meanDistFromStop[i] <- NA
-        varDistFromStop[i] <- NA
-        medianDistFromStop[i] <- NA
-        freqIn5[i] <- NA
-        freqInCDS[i] <- NA
-        freqIn3[i] <- NA
-      }
-      
-      if(!is.null(centeredClass)){
-        freqStart3[i] <- sum(classCounts[i, which(centeredClass == 3)]) / classCount
-        freqStart4[i] <- sum(classCounts[i, which(centeredClass == 4)]) / classCount
-        freqStart5[i] <- sum(classCounts[i, which(centeredClass == 5)]) / classCount
-      }
-    } 
   }
   
   colnames(nucFreqMat) <- c(sapply(
@@ -370,24 +372,32 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   # GU wobble not allowed at position 1 or 8 so concatenate the seach letters
   # for 1 and 8 to GU wobble versions of the core 2-7 seed
   c2GU <- guWob_seqs(seq_6mer)
-  c2GU7merm8 <- xscat(letter(miRNA_revComp, length(miRNA_revComp)-7), c2GU, 
-                      notMatch1)
-  c2GU8mer <- xscat(letter(miRNA_revComp, length(miRNA_revComp)-7), c2GU,
-                    letter(miRNA_revComp, length(miRNA_revComp)))
-  c2GU7merA1 <- xscat(notMatch8, c2GU, "A")
-  c2Full <- DNAStringSet(c(c2GU7merA1, c2GU7merm8, c2GU8mer))
-  
+  if(length(c2GU) > 0){
+    c2GU7merm8 <- xscat(letter(miRNA_revComp, length(miRNA_revComp)-7), c2GU, 
+                        notMatch1)
+    c2GU8mer <- xscat(letter(miRNA_revComp, length(miRNA_revComp)-7), c2GU,
+                      letter(miRNA_revComp, length(miRNA_revComp)))
+    c2GU7merA1 <- xscat(notMatch8, c2GU, "A")
+    c2Full <- DNAStringSet(c(c2GU7merA1, c2GU7merm8, c2GU8mer))
+  } else {
+    c2Full <- DNAStringSet()
+  }
+    
   # class 3 search strings
   class3search <- misMatchNotGU(class1Search, start = 2, end = 7)
   
   # class 4 search strings
-  c4A1 <- misMatchNotGU(c2GU7merA1, start = 2, end = 7, 
-                        reference = seq_7merA1)
-  c4m8 <- misMatchNotGU(c2GU7merm8, start = 2, end = 7, 
-                        reference = seq_7merm8)
-  c4_8mer <- misMatchNotGU(c2GU8mer, start = 2, end = 7, 
-                           reference = seq_8mer)
-  class4search <- DNAStringSet(c(c4A1, c4m8, c4_8mer))
+  if(length(c2GU) > 0){
+    c4A1 <- misMatchNotGU(c2GU7merA1, start = 2, end = 7, 
+                          reference = seq_7merA1)
+    c4m8 <- misMatchNotGU(c2GU7merm8, start = 2, end = 7, 
+                          reference = seq_7merm8)
+    c4_8mer <- misMatchNotGU(c2GU8mer, start = 2, end = 7, 
+                             reference = seq_8mer)
+    class4search <- DNAStringSet(c(c4A1, c4m8, c4_8mer))
+  } else {
+    class4search <- DNAStringSet()
+  }
   
   # class 5 search string
   class5Search <- xscat(notMatch8, seq_6mer, notMorA1)
