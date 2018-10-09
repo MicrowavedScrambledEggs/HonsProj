@@ -17,11 +17,11 @@ predictResults <- function(predictions, testSet){
   noFalseNeg <- nrow(falseNeg)
   testN <- nrow(testSet)
   testAcuracy <- (noTruePos + noTrueNeg) / testN
-  specificity <- noTruePos / (noTruePos + noFalsePos)
-  sensitivity <- noTruePos / (noTruePos + noFalseNeg)
+  precision <- noTruePos / (noTruePos + noFalsePos)
+  recall <- noTruePos / (noTruePos + noFalseNeg)
   results <- c(testAcuracy, specificity, sensitivity, noTrueNeg, noFalseNeg,
                noTruePos, noFalsePos)
-  names(results) <- c("Accuracy", "Specificity", "Sensitivity", 
+  names(results) <- c("Accuracy", "Precision", "Recall", 
                       "# True Negatives", "# False Negatives", 
                       "# True Positives", "# False Positives")
   return(results)
