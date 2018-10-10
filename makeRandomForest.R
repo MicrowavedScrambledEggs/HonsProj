@@ -125,19 +125,19 @@ cvTrainingSet <- function(featsList, trainNo){
 
 # Now the 10 x 11 fold CV
 # Rewritten for memory efficiency
-executeCV <- function(featsList){
+executeCV <- function(featsList, reps = 10){
   predFeats <- colnames(featsList[[1]])
   predFeats <- predFeats[!predFeats %in% c("Target", "GenBank.Accession")]
-  resultsMatrix <- matrix(nrow = 10*length(featsList), ncol = 11)
-  mdaMatrix <- matrix(ncol = 10*length(featsList), nrow = length(predFeats))
-  mdfMatrix <- matrix(ncol = 10*length(featsList), nrow = length(predFeats))
-  mdnfMatrix <- matrix(ncol = 10*length(featsList), nrow = length(predFeats))
+  resultsMatrix <- matrix(nrow = reps*length(featsList), ncol = 11)
+  mdaMatrix <- matrix(ncol = reps*length(featsList), nrow = length(predFeats))
+  mdfMatrix <- matrix(ncol = reps*length(featsList), nrow = length(predFeats))
+  mdnfMatrix <- matrix(ncol = reps*length(featsList), nrow = length(predFeats))
   rownames(mdaMatrix) <- predFeats
   rownames(mdfMatrix) <- predFeats
   rownames(mdnfMatrix) <- predFeats
   runNo <- 1
   runNames <- c()
-  for(i in 1:10){
+  for(i in 1:reps){
     balancedFeatsList <- balanceFeatMat(featsList, runNo)
     for(j in 1:length(balancedFeatsList)){
       runName <- paste0("Run ", i, ": ", names(balancedFeatsList[j]))
@@ -188,13 +188,17 @@ measureDA <- function(rf, testSet, results, seed){
   return(daMat)
 }
 
-cv.10.11 <- executeCV(trimFeatsList) 
+cv.10.11 <- executeCV(trimFeatsList, 10) 
 
+# Looks like miR-548d pairs just get all classed as non-targets
+# Could be:
+#    - miR-548d data is crap
+#    - Every other dataset is crap
+#    - miR-548d is that much of a special snowflake 
+#        - no GU wobble in seed
 
 # Random Forest trained on just miR-548d data
-new548d <- createNewFeatures(featMat.548d)
-comb548d <- cbind(featMat.548d, new548d)
-trim548d <- removeBadFeats(comb548d)
+trim548d <- trimFeatsList$`miR-548d`
 
 set.seed(456)
 trainRows <- sample.int(nrow(trim548d), floor((4 * nrow(trim548d))/5))
@@ -207,3 +211,51 @@ rf.548d <- randomForest(Target~., data = train548d, importance = TRUE)
 pred.548d <- predict(rf.548d, test548d)
 results.548d <- predictResults(pred.548d, test548d)
 imp548d <- importance(rf.548d, type = 1)
+
+# CV without miR-548d data
+cv.wout.548d <- executeCV(trimFeatsList[-6], 1)
+
+# Training and testing on 548d gets 70% accuracy, 
+# CV perfomance appears unaffected by the removal of 548d, c4 features are 
+# important in all the CV rfs, but 548d does not have G or U in it's seed.
+# From this I conclude that the other rfs have learned to classify all miRNA
+# with no c4 seed sites as non-targets.
+
+# Test if we got the correct 30e sequence
+featMat.30e <- convertMissingValues(featMat.30e)
+new.30e <- createNewFeatures(featMat.30e)
+comb.30e <- cbind(featMat.30e, new.30e)
+trim.30e <- removeBadFeats(comb.30e)
+
+set.seed(678)
+train.30e.row <- sample.int(nrow(trim.30e), round((4/5)*nrow(trim.30e)))
+train.30e <- trim.30e[train.30e.row, -1]
+test.30e <- trim.30e[-train.30e.row, ]
+
+rf.30e <- randomForest(Target~., data = train.30e, importance = TRUE)
+pred.30e <- predict(rf.30e, test.30e)
+results.30e <- predictResults(pred.30e, test.30e)
+
+# now try 3p
+miR30e.3p <- "CUUUCAGUCGGAUGUUUACAGC"
+s.rS.fM.30e.3p <- createFeatureMatrix(miR30e.3p, accToTarg.30e[,1], 
+                                   accToTarg.30e[,2])
+freeEngFeats.30e.3p <- siteDuplexFreeEnergy(miR30e.3p, s.rS.fM.30e.3p[[2]],
+                                         s.rS.fM.30e.3p[[1]])
+freeEngFeats.30e.3p$GenBank.Accession <- names(s.rS.fM.30e.3p[[2]])
+featMat.30e.3p <- merge(s.rS.fM.30e.3p[[3]], freeEngFeats.30e.3p, by = "GenBank.Accession")
+featMat.30e.3p <- convertMissingValues(featMat.30e.3p)
+
+new.30e.3p <- createNewFeatures(featMat.30e.3p)
+comb.30e.3p <- cbind(featMat.30e.3p, new.30e.3p)
+trim.30e.3p <- removeBadFeats(comb.30e.3p)
+
+set.seed(678)
+train.30e.3p.row <- sample.int(nrow(trim.30e.3p), round((4/5)*nrow(trim.30e.3p)))
+train.30e.3p <- trim.30e.3p[train.30e.3p.row, -1]
+test.30e.3p <- trim.30e.3p[-train.30e.3p.row, ]
+
+rf.30e.3p <- randomForest(Target~., data = train.30e.3p, importance = TRUE)
+pred.30e.3p <- predict(rf.30e.3p, test.30e.3p)
+results.30e.3p <- predictResults(pred.30e.3p, test.30e.3p)
+
