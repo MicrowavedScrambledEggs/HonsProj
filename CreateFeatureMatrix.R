@@ -493,8 +493,8 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
     fullFeatTable <- merge(fullFeatTable, accToTarget, 
                            by = "GenBank.Accession")
     # Remove targets where no sites were found (should be rare)
-    beforeRemoval <- nrow(fullFeatTable[targCol == 1,])
-    fullFeatTable <- fullFeatTable[!(targCol == 1 & fullFeatTable$N == 0), ]
+    beforeRemoval <- nrow(fullFeatTable[fullFeatTable$Target == 1,])
+    fullFeatTable <- fullFeatTable[!(fullFeatTable$Target == 1 & fullFeatTable$N == 0), ]
     afterRemoval <- nrow(fullFeatTable[fullFeatTable$Target == 1,])
     numTargRemoved <- beforeRemoval - afterRemoval
     print(paste("Removed", numTargRemoved, 
