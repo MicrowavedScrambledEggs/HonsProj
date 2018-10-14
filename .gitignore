@@ -8,3 +8,4 @@
 .RDataTmp
 *.out
 /Data/*
+accSeqRegions.csv

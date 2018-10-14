@@ -321,21 +321,21 @@ boxplot(CAKI.4536.all.data$E~CAKI.4536.all.data$genes$Status, log="y", las=2)
 boxplot(log2(CAKI.4536.all.data$E), range=0, ylab="log 2 intensity", las=2)
 #background correct and normalize, using the ERCC genes as the negative control
 y.4536 <- neqc(CAKI.4536.all.data, negctrl="ERCC")
-# Remove probes not expressed in at least 3 arrays
-# (as 3 is the size of the pulldown/control groups of arrays)
-expressed <- rowSums(y.4536$other$Detection < 0.05) >= 2
+# Remove probes not expressed in all arrays of at least one group of control or pulldown
+expressed.cont <- rowSums(y.4536[,1:3]$other$Detection < 0.05) >= 3
+expressed.pull <- rowSums(y.4536[,4:6]$other$Detection < 0.05) >= 3
+expressed <- expressed.cont | expressed.pull
 y.4536 <- y.4536[expressed,]
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Type)
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Sample.Group)
-# control sample A doesn't look right
+# control sample A looks like it's miles away
 # recorrect without the bad sample A controls
 y.4536 <- neqc(CAKI.4536.all.data[,-1], negctrl = "ERCC")
+expressed.cont <- rowSums(y.4536[,1:2]$other$Detection < 0.05) >= 2
+expressed <- expressed.cont | expressed.pull
+y.4536 <- y.4536[expressed,]
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Type[-1])
 plotMDS(y.4536, labels = CAKI.4536.array.labels$Sample.Group[-1])
-# Reremove probes not expressed in at least 2 arrays
-# (as 2 is the smallest size of the pulldown/control groups of arrays)
-expressed <- rowSums(y.4536$other$Detection < 0.05) >= 2
-y.4536 <- y.4536[expressed,]
 
 layout.CAKI.4536 <- CAKI.4536.array.labels$Type[-1]
 cols.CAKI.4536 <- (1:5)
@@ -393,8 +393,9 @@ all.data.155.584<-read.ilmn(
   other.columns="Detection", sep="\t", verbose=TRUE
 )
 boxplot(all.data.155.584$E~all.data.155.584$genes$Status, las=2)
+boxplot(log2(all.data.155.584$E)~all.data.155.584$genes$Status, las=2)
 boxplot(log2(all.data.155.584$E),range=0,ylab="log2 intensity", las=2)
-y.155.584 <- neqc(all.data.155.584, negctrl = "NEGATIVE")
+y.155.584 <- neqc(all.data.155.584, negctrl = "ERCC")
 boxplot(log2(y.155.584$E),range=0,ylab="log2 intensity", las=2)
 plotMDS(y.155.584, labels = array.labels.155.584$Type)
 pancCols.155 <- c(4,5,6,10,11,12)
@@ -416,7 +417,13 @@ plotMDS(y.155.584[,c(pancCols.155)],
         labels = array.labels.155.584$Sample.Group[c(pancCols.155)])
 plotMDS(y.155.584[,c(pancCols.155)], 
         labels = array.labels.155.584$Type[c(pancCols.155)])
-# Controls clustering to gether so probably legit
+# Controls clustering to gether so probably legit but 065_L miles away from 
+# everything else so will exclude
+pancCols.155 <- c(4,5,6,10,11)
+plotMDS(y.155.584[,c(pancCols.155)], 
+        labels = array.labels.155.584$Sample.Group[c(pancCols.155)])
+plotMDS(y.155.584[,c(pancCols.155)], 
+        labels = array.labels.155.584$Type[c(pancCols.155)])
 
 # look at panc 584
 plotMDS(y.155.584[,c(pancCols.584)], 
@@ -431,7 +438,7 @@ plotMDS(y.155.584[,c(skovCols.584, skovCols.155)],
 # 200162410075_G is dodgy (col 19). Though is it...? Maybe 75_H is cos it's on Controls
 skovCols.584 <- c(13,14,15,19,21)
 plotMDS(y.155.584[,c(skovCols.584, skovCols.155)], 
-        labels = array.labels.155.584$miRNA[c(skovCols.584, skovCols.155)])
+        labels = array.labels.155.584$Type[c(skovCols.584, skovCols.155)])
 # look at skov 155
 plotMDS(y.155.584[,c(skovCols.155)], 
         labels = array.labels.155.584$Type[c(skovCols.155)])
@@ -439,22 +446,48 @@ plotMDS(y.155.584[,c(skovCols.155)],
 plotMDS(y.155.584[,c(1,2,7,8)], 
         labels = array.labels.155.584$Type[c(1,2,7,8)])
 # look at skov 584
-plotMDS(y.155.584[,c(skovCols.584)], 
-        labels = array.labels.155.584$Type[c(skovCols.584)])
+plotMDS(y.155.584[,c(skovCols.584,20)], 
+        labels = array.labels.155.584$Type[c(skovCols.584,20)])
 skovCols.155 <- c(1,2,7,8)
 
+# Both 584 experiments seem a bit suss 
+# Go with 155 data, Measure logFC separately then combine target sets
+# Filter out probes not sufficiently expressed in all of a group of control
+# or pulldown from PANC
+expressed.cont <- rowSums(y.155.584[,c(4,5,6)]$other$Detection < 0.05) == 3
+expressed.pull <- rowSums(y.155.584[,c(10,11)]$other$Detection < 0.05) == 2
+expressed <- expressed.cont | expressed.pull
+y.155.PANC <-  y.155.584[expressed, pancCols.155]
+layout.155.PANC <- array.labels.155.584$Type[pancCols.155]
+fgl.155.PANC <- measurelogFC(y.155.PANC, layout.155.PANC, 1:5)
+accToTarg.155.PANC <- accToTargMatRAW(fgl.155.PANC)
+table(accToTarg.155.PANC[,2])
+# huh, bigger and better
+
 # Use SKOV arrays
-# exclude probes not expressed (pvalue >0.05) in at least 4 (num pulldowns) arrays
-# 4 is the smallest size of the pulldown/control groups of arrays
-expressed <- rowSums(
-  y.155.584$other$Detection[,c(skovCols.155, skovCols.584)] < 0.05) >= 4
-y.155.584 <- y.155.584[expressed,]
+# filter out not sufficiently expressed arrays as above
+expressed.cont <- rowSums(y.155.584[,c(1,2)]$other$Detection < 0.05) == 2
+expressed.pull <- rowSums(y.155.584[,c(7,8)]$other$Detection < 0.05) == 2
+expressed <- expressed.cont | expressed.pull
+y.155.SKOV <-  y.155.584[expressed, skovCols.155]
 # miR155
-layout.155 <- array.labels.155.584$Type[skovCols.155]
-fgl.155 <- measurelogFC(y.155.584, layout.155, skovCols.155)
-accToTarg.155 <- accToTargMatRAW(fgl.155)
-table(accToTarg.155[,2])
+layout.155.SKOV <- array.labels.155.584$Type[skovCols.155]
+fgl.155.SKOV <- measurelogFC(y.155.SKOV, layout.155.SKOV, 1:4)
+accToTarg.155.SKOV <- accToTargMatRAW(fgl.155.SKOV)
+table(accToTarg.155.SKOV[,2])
 # small sample!
+# See if SKOV contains any targets not seen in PANC
+accToTarg.155.SKOV[!(accToTarg.155.SKOV[,1] %in% accToTarg.155.PANC[,1]),]
+# Ok all but 3 of them. Check the 3 agree between cell types
+accToTarg.155.SKOV[(accToTarg.155.SKOV[,1] %in% accToTarg.155.PANC[,1]),]
+accToTarg.155.PANC[(accToTarg.155.PANC[,1] %in% accToTarg.155.SKOV[,1]),]
+# NM_198836.1 is a target in one and nontarget in other. exclude
+accToTarg.155.SKOV <- accToTarg.155.SKOV[
+  !(accToTarg.155.SKOV[,1] %in% accToTarg.155.PANC[,1]),]
+accToTarg.155.PANC <- accToTarg.155.PANC[
+  accToTarg.155.PANC[,1] != "NM_198836.1",]
+# Merge
+accToTarg.155 <- rbind(accToTarg.155.SKOV, accToTarg.155.PANC)
 
 # miR-584
 layout.584 <- array.labels.155.584$Type[skovCols.584]
@@ -462,6 +495,7 @@ fgl.584 <- measurelogFC(y.155.584, layout.584, skovCols.584)
 accToTarg.584 <- accToTargMatRAW(fgl.584)
 table(accToTarg.584[,2])
 # relatively ballanced for once
+# Probably won't use cos source data is dodgy 
 
 # Get features!
 
@@ -508,8 +542,10 @@ all.data.548d.1289<-read.ilmn(
   ctrlfiles=paste0(dat.dir, "control probe profile.txt"),probeid="PROBE_ID", 
   other.columns="Detection", sep="\t", verbose=TRUE
 )
+all.data.548d.1289$genes$Status[
+  grepl("ERCC", all.data.548d.1289$genes$Status)] <- "ERCC"
 boxplot(all.data.548d.1289$E~all.data.548d.1289$genes$Status, las=2)
-boxplot(log2(all.data.548d.1289$E)~all.data.548d.1289$genes$Status, las=2)
+boxplot(all.data.548d.1289$E~all.data.548d.1289$genes$Status, las=2, log = "y")
 # A fair bit of exrpession in the negative controls at the levels at which 
 # the bulk of the regular genes are expressed
 # normalise with ERCC instead
@@ -532,21 +568,21 @@ plotMDS(y.548d.1289[,cakiCols.1289],
         labels = array.labels.548d.1289$Type[cakiCols.1289])
 # So beautiful :')
 
-layout.548d.skov <- array.labels.548d.1289$Type[skovCols.548d]
-fgl.548d.skov <- measurelogFC(y.548d.1289, layout.548d.skov, skovCols.548d)
-accToTarg.548d.skov <- accToTargMatRAW(fgl.548d.skov)
-table(accToTarg.548d.skov[,2])
-# That's alotta data!
-# Wait whoops forgot to filter out lowly expressed genes
-expressed <- rowSums(y.548d.1289$other$Detection[,skovCols.548d] < 0.05) >= 3
+# SKOV
+# filter out lowly expressed genes for 548d
+expressed.cont <- rowSums(y.548d.1289[,1:3]$other$Detection < 0.05) == 3
+expressed.pull <- rowSums(y.548d.1289[,4:6]$other$Detection < 0.05) == 3
+expressed <- expressed.cont | expressed.pull
 y.548d.skov <- y.548d.1289[expressed,skovCols.548d]
+layout.548d.skov <- array.labels.548d.1289$Type[skovCols.548d]
 fgl.548d.skov <- measurelogFC(y.548d.skov, layout.548d.skov, 1:6)
 accToTarg.548d.skov <- accToTargMatRAW(fgl.548d.skov)
 table(accToTarg.548d.skov[,2])
-# ah didn't change number of targets and non-targets anyway
 
 # Filter out lowly expressed genes for 1289
-expressed <- rowSums(y.548d.1289$other$Detection[,skovCols.1289] < 0.05) >= 3
+expressed.cont <- rowSums(y.548d.1289[,13:15]$other$Detection < 0.05) == 3
+expressed.pull <- rowSums(y.548d.1289[,16:18]$other$Detection < 0.05) == 3
+expressed <- expressed.cont | expressed.pull
 y.1289.skov <- y.548d.1289[expressed, skovCols.1289]
 
 layout.1289.skov <- array.labels.548d.1289$Type[skovCols.1289]
@@ -555,10 +591,58 @@ accToTarg.1289.skov <- accToTargMatRAW(fgl.1289.skov)
 table(accToTarg.1289.skov[,2])
 #nice
 
+# CAKI
+# filter out lowly expressed genes for 548d
+expressed.cont <- rowSums(y.548d.1289[,7:9]$other$Detection < 0.05) == 3
+expressed.pull <- rowSums(y.548d.1289[,10:12]$other$Detection < 0.05) == 3
+expressed <- expressed.cont | expressed.pull
+y.548d.caki <- y.548d.1289[expressed,cakiCols.548d]
+layout.548d.caki <- array.labels.548d.1289$Type[cakiCols.548d]
+fgl.548d.caki <- measurelogFC(y.548d.caki, layout.548d.caki, 1:6)
+accToTarg.548d.caki <- accToTargMatRAW(fgl.548d.caki)
+table(accToTarg.548d.caki[,2])
+
+# Filter out lowly expressed genes for 1289
+expressed.cont <- rowSums(y.548d.1289[,19:21]$other$Detection < 0.05) == 3
+expressed.pull <- rowSums(y.548d.1289[,22:24]$other$Detection < 0.05) == 3
+expressed <- expressed.cont | expressed.pull
+y.1289.caki <- y.548d.1289[expressed, cakiCols.1289]
+
+layout.1289.caki <- array.labels.548d.1289$Type[cakiCols.1289]
+fgl.1289.caki <- measurelogFC(y.1289.caki, layout.1289.caki, 1:6)
+accToTarg.1289.caki <- accToTargMatRAW(fgl.1289.caki)
+table(accToTarg.1289.caki[,2])
+
+# 548d combining target tables
+# Check the crossover to see if they agree
+skov.cros.548d <- accToTarg.548d.skov[
+  accToTarg.548d.skov[,1] %in% accToTarg.548d.caki[,1],]
+caki.cros.548d <- accToTarg.548d.caki[
+  accToTarg.548d.caki[,1] %in% accToTarg.548d.skov[,1],]
+skov.cros.548d[skov.cros.548d[,1] == caki.cros.548d[,1] &
+                 skov.cros.548d[,2] != caki.cros.548d[,2], ]
+# All in agreement apparently!
+# merge 
+accToTarg.548d <- merge(accToTarg.548d.caki, accToTarg.548d.skov, 
+                        all.y =TRUE, all.x =TRUE)
+
+# 1289 combining target tables
+# Check the crossover to see if they agree
+skov.cros.1289 <- accToTarg.1289.skov[
+  accToTarg.1289.skov[,1] %in% accToTarg.1289.caki[,1],]
+caki.cros.1289 <- accToTarg.1289.caki[
+  accToTarg.1289.caki[,1] %in% accToTarg.1289.skov[,1],]
+skov.cros.1289[skov.cros.1289[,1] == caki.cros.1289[,1] &
+                 skov.cros.1289[,2] != caki.cros.1289[,2], ]
+# All in agreement apparently!
+# merge 
+accToTarg.1289 <- merge(accToTarg.1289.caki, accToTarg.1289.skov, 
+                        all.y =TRUE, all.x =TRUE)
+
 # miR-548d feats
 miR548d.3p <- "CAAAAACCACAGUUUCUUUUGC" 
-s.rS.fM.548d <- createFeatureMatrix(miR548d.3p, accToTarg.548d.skov[,1],
-                                    accToTarg.548d.skov[,2])
+s.rS.fM.548d <- createFeatureMatrix(miR548d.3p, accToTarg.548d[,1],
+                                    accToTarg.548d[,2])
 fEF.548d <- siteDuplexFreeEnergy(miR548d.3p, s.rS.fM.548d[[2]],
                                  s.rS.fM.548d[[1]])
 fEF.548d$GenBank.Accession <- names(s.rS.fM.548d[[2]])
@@ -567,8 +651,8 @@ featMat.548d <- convertMissingValues(featMat.548d)
 
 # miR-1289 feats
 miR1289 <- "UGGAGUCCAGGAAUCUGCAUUUU"
-s.rS.fM.1289 <- createFeatureMatrix(miR1289, accToTarg.1289.skov[,1],
-                                    accToTarg.1289.skov[,2])
+s.rS.fM.1289 <- createFeatureMatrix(miR1289, accToTarg.1289[,1],
+                                    accToTarg.1289[,2])
 fEF.1289 <- siteDuplexFreeEnergy(miR1289, s.rS.fM.1289[[2]],
                                  s.rS.fM.1289[[1]])
 fEF.1289$GenBank.Accession <- names(s.rS.fM.1289[[2]])

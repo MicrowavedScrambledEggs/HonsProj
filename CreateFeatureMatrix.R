@@ -303,6 +303,10 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   # using matchPattern with RNAString
   miRNAString <- gsub("U", "T", miRNAString)
   
+  # Incase the acc and targCol is a factor vector 
+  acc <- as.character(acc)
+  if(!is.null(targCol)) targCol <- as.character(targCol)
+  
   miLen <- nchar(miRNAString)
   
   # Create feature values for nucleotide identies of miRNA
@@ -493,8 +497,8 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
     fullFeatTable <- merge(fullFeatTable, accToTarget, 
                            by = "GenBank.Accession")
     # Remove targets where no sites were found (should be rare)
-    beforeRemoval <- nrow(fullFeatTable[targCol == 1,])
-    fullFeatTable <- fullFeatTable[!(targCol == 1 & fullFeatTable$N == 0), ]
+    beforeRemoval <- nrow(fullFeatTable[fullFeatTable$Target == 1,])
+    fullFeatTable <- fullFeatTable[!(fullFeatTable$Target == 1 & fullFeatTable$N == 0), ]
     afterRemoval <- nrow(fullFeatTable[fullFeatTable$Target == 1,])
     numTargRemoved <- beforeRemoval - afterRemoval
     print(paste("Removed", numTargRemoved, 
