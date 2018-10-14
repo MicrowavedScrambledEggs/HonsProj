@@ -303,6 +303,10 @@ createFeatureMatrix <- function(miRNAString, acc, targCol = NULL)
   # using matchPattern with RNAString
   miRNAString <- gsub("U", "T", miRNAString)
   
+  # Incase the acc and targCol is a factor vector 
+  acc <- as.character(acc)
+  if(!is.null(targCol)) targCol <- as.character(targCol)
+  
   miLen <- nchar(miRNAString)
   
   # Create feature values for nucleotide identies of miRNA
