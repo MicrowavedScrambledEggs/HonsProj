@@ -146,7 +146,8 @@ executeCV <- function(featsList, reps = 10){
       trainSetCV <- cvTrainingSet(balancedFeatsList, j)
       testSetCV <- balancedFeatsList[[j]]
       set.seed(runNo)
-      miRFCV <- randomForest(Target ~ ., data = trainSetCV)
+      miRFCV <- randomForest(Target ~ ., data = trainSetCV, 
+                             importance = TRUE, )
       predCV <- predict(miRFCV, testSetCV)
       predResultCV <- predictResults(predCV, testSetCV)
       resultsMatrix[runNo,] <- predResultCV
@@ -258,4 +259,9 @@ test.30e.3p <- trim.30e.3p[-train.30e.3p.row, ]
 rf.30e.3p <- randomForest(Target~., data = train.30e.3p, importance = TRUE)
 pred.30e.3p <- predict(rf.30e.3p, test.30e.3p)
 results.30e.3p <- predictResults(pred.30e.3p, test.30e.3p)
+
+# 30e.3p had less targets without sites and performs better (better at 
+# classifiying non-targets) so is likely the 30e sequence used
+
+
 
