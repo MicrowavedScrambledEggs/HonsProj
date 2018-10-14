@@ -144,6 +144,51 @@ rf.30e.3p <- randomForest(Target~., data = train.30e.3p, importance = TRUE)
 pred.30e.3p <- predict(rf.30e.3p, test.30e.3p)
 results.30e.3p <- predictResults(pred.30e.3p, test.30e.3p)
 
+# Find good ntree
+trim155 <- trimFeatsList$`miR-155`
+
+set.seed(456)
+trainRows <- sample.int(nrow(trim155), floor((4 * nrow(trim155))/5))
+train155 <- trim155[trainRows,-1]
+table(train155$Target)
+test155 <- trim155[-trainRows,-1]
+table(test155$Target)
+set.seed(567)
+targCol <- which(colnames(test155) == "Target")
+rf.155.501 <- randomForest(x=train155[,-targCol], y=train155$Target, 
+                       xtest = test155[,-targCol], ytest = test155$Target,
+                       ntree = 501)
+rf.155.501
+rf.155.1001 <- randomForest(x=train155[,-targCol], y=train155$Target, 
+                           xtest = test155[,-targCol], ytest = test155$Target,
+                           ntree = 1001)
+rf.155.1001
+rf.155.251 <- randomForest(x=train155[,-targCol], y=train155$Target, 
+                           xtest = test155[,-targCol], ytest = test155$Target,
+                           ntree = 251)
+rf.155.251
+
+# Train and test an RF sampling from all the data
+set.seed(654)
+train.all <- rbind(train548d, train155)
+test.all <- rbind(test548d, test155)
+for(miName in names(trimFeatsList)){
+  if(!miName %in% c("miR-548d", "miR-155")){
+    trimSet <- trimFeatsList[[miName]]
+    trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
+    trainSet <- trimSet[trainRows,-1]
+    print(table(trainSet$Target))
+    testSet <- trimSet[-trainRows,-1]
+    print(table(testSet$Target))
+    train.all <- rbind(train.all, trainSet)
+    test.all <- rbind(test.all, testSet)
+  }
+}
+
+targCol <- which(colnames(test.all) == "Target")
+all.rf <- randomForest(
+  x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
+  ytest = test.all$Target, ntree = 251, importance = TRUE)
 
 
 

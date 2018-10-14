@@ -116,7 +116,7 @@ executeCV <- function(featsList, reps = 10){
       ytest <- testSetCV$Target
       set.seed(runNo)
       miRFCV <- randomForest(x = x, y = y, xtest = xtest, ytest = ytest, 
-                             keep.forest = TRUE)
+                             keep.forest = TRUE, ntree = 251)
       predResultCV <- predStatistics(miRFCV$test)
       resultsMatrix[runNo,] <- predResultCV
       mdaList[[runNo]] <- measureDA(miRFCV, testSetCV, predFeats, runNo)
@@ -201,3 +201,36 @@ cvVariableImportance <- function(mdaList, nameTestSet, reps){
   return(list(testSetsDAs = testSetsDAs, testSetsDNTAs=testSetsDNTAs,
               testSetsDTAs = testSetsDTAs))
 }
+
+varImpPlot2 <- function (imp, sort = TRUE, n.var = min(30, nrow(imp)), 
+          main = deparse(substitute(imp)), xlab=NULL, ...) 
+{
+  if (ncol(imp) > 2) 
+    imp <- imp[, -(1:(ncol(imp) - 2))]
+  nmeas <- ncol(imp)
+  if (nmeas > 1) {
+    op <- par(mfrow = c(1, 2), mar = c(4, 5, 4, 1), 
+              mgp = c(2, 0.8, 0), oma = c(0, 0, 2, 0), no.readonly = TRUE)
+    on.exit(par(op))
+  }
+  for (i in 1:nmeas) {
+    ord <- if (sort) 
+      rev(order(imp[, i], decreasing = TRUE)[1:n.var])
+    else 1:n.var
+    xmin <- if (colnames(imp)[i] %in% c("IncNodePurity", 
+                                        "MeanDecreaseGini")) 
+      0
+    else min(imp[ord, i])
+    xlab <- if (is.null(xlab)) colnames(imp)
+      else xlab
+    dotchart(imp[ord, i], xlab = xlab[i], ylab = "", 
+             main = if (nmeas == 1) 
+               main
+             else NULL, xlim = c(xmin, max(imp[, i])), ...)
+  }
+  if (nmeas > 1) 
+    mtext(outer = TRUE, side = 3, text = main, cex = 1.2)
+  invisible(imp)
+}
+
+
