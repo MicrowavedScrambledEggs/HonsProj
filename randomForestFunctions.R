@@ -61,23 +61,29 @@ predStatistics <- function(rfTest) {
 
 # balance targets and non targets by only sampling from the bigger set
 # an amout equal to the smaller set 
+# Also balance each miRNA set size
 # i.e for 300 targs and 100 non targs, include all non targs but sample
 # only 100 targs
 balanceFeatMat <- function(featsList, seed){
   balancedFeatsList <- featsList
+  setSize <- min(sapply(balancedFeatsList, nrow))
   set.seed(seed)
   for(i in 1:length(featsList)){
     targCount <- table(featsList[[i]]$Target)
+    if(TRUE %in% (targCount < floor(setSize/2))){
+      targCount[which(!(targCount < floor(setSize/2)))] <- 
+        setSize - targCount[which(targCount < floor(setSize/2))]
+    } else {
+      targCount <- c("0"=ceiling(setSize/2), "1"=floor(setSize/2))
+    }
     nonTRows <- which(featsList[[i]]$Target == "0")
     targRows <- which(featsList[[i]]$Target == "1")
     if(targCount["0"] != 0 & targCount["1"] != 0){
-      if(targCount["0"] < targCount["1"]){
-        balancedFeatsList[[i]] <- 
-          featsList[[i]][c(targRows[sample.int(targCount["0"])], nonTRows),]
-      } else {
-        balancedFeatsList[[i]] <- 
-          featsList[[i]][c(nonTRows[sample.int(targCount["1"])], targRows),]
-      }
+      balancedFeatsList[[i]] <- 
+        featsList[[i]][c(targRows[sample.int(targCount["1"])], 
+                         nonTRows[sample.int(targCount["0"])]),]
+    } else {
+      balancedFeatsList[[i]] <- featsList[[i]][sample.int(setSize),]
     }
   }
   return(balancedFeatsList)

@@ -33,11 +33,20 @@ new.4536 <- accToTarg.4536[
 new.4536
 # There's two. Probably not worth extracting features for
 # Find the RNA to purge from featMat
-purge.4536 <- accToTarg.4536.old[
-  !(accToTarg.4536.old[,1] %in% accToTarg.4536[,1]),1]
+purge.4536 <- featMat.4536$GenBank.Accession[
+  !(featMat.4536$GenBank.Accession %in% accToTarg.4536[,1])]
 featMat.4536 <- featMat.4536[!(featMat.4536$GenBank.Accession %in% purge.4536),]
+trimFeatsList$`miR-4536` <- trimFeatsList$`miR-4536`[
+  !(trimFeatsList$`miR-4536`$GenBank.Accession %in% purge.4536),]
 
-# miR 155 i got more data so will have to train a bunch of new feats anyway
+# miR 155
+purge.155 <- featMat.155$GenBank.Accession[
+  !(featMat.155$GenBank.Accession %in% accToTarg.155[,1])
+]
+featMat.155 <- featMat.155[!(featMat.155$GenBank.Accession %in% purge.155),]
+trimFeatsList$`miR-155` <- trimFeatsList$`miR-155`[
+  !(trimFeatsList$`miR-155`$GenBank.Accession %in% purge.155),]
+
 # miR 584 I don't trust the data so I'll probably won't use anymore
 
 # miR 548d I accidentally wrote over the old accToTarg.548d.SKOV
@@ -49,8 +58,10 @@ missing.548d.SKOV <- accToTarg.548d.skov[
 # for just in case, and I'll be having to do for new RNA from CAKI anyway
 # Find the RNA to purge
 purge.548d <- featMat.548d$GenBank.Accession[
-  !(featMat.548d$GenBank.Accession %in% accToTarg.548d.skov[,1])] 
+  !(featMat.548d$GenBank.Accession %in% accToTarg.548d[,1])] 
 featMat.548d <- featMat.548d[!(featMat.548d$GenBank.Accession %in% purge.548d),]
+trimFeatsList$`miR-548d` <- trimFeatsList$`miR-548d`[
+  !(trimFeatsList$`miR-548d`$GenBank.Accession %in% purge.548d),]
 
 # miR-1289
 accToTarg.1289.skov.old <- accToTarg.1289.skov
@@ -59,12 +70,32 @@ new.1289 <- accToTarg.1289.skov[
   !(accToTarg.1289.skov[,1] %in% accToTarg.1289.skov.old[,1]), ]
 new.1289
 # only 3, so not worth training feats for
-purge.1289 <- accToTarg.1289.skov.old[
-  !(accToTarg.1289.skov.old[,1] %in% accToTarg.1289.skov[,1]),1
-]
+purge.1289 <- featMat.1289$GenBank.Accession[
+  !(featMat.1289$GenBank.Accession %in% accToTarg.1289[,1])] 
 featMat.1289 <- featMat.1289[!(featMat.1289$GenBank.Accession %in% purge.1289), ]  
+trimFeatsList$`miR-1289` <- trimFeatsList$`miR-1289`[
+  !(trimFeatsList$`miR-1289`$GenBank.Accession %in% purge.1289),]
+
+purge.30e <- featMat.30e$GenBank.Accession[
+  !(featMat.30e$GenBank.Accession %in% accToTarg.30e[,1])] 
+new.30e <- accToTarg.30e[
+  !(accToTarg.30e[,1] %in% featMat.30e$GenBank.Accession),
+]
+new.30e <- as.character(new.30e)
+featMat.30e <- featMat.30e[!(featMat.30e$GenBank.Accession %in% purge.30e), ]  
 
 # Learn new feats for new pairs
+
+# new30e
+s.rS.fM.30e.new <- createFeatureMatrix(miR30e.5p, new.30e[,1], new.30e[,2])
+fEF.30e.new <- siteDuplexFreeEnergy(miR30e.5p, s.rS.fM.30e.new[[2]],
+                                     s.rS.fM.30e.new[[1]])
+fEF.30e.new$GenBank.Accession <- names(s.rS.fM.30e.new[[2]])
+featMat.30e.new <- merge(s.rS.fM.30e.new[[3]], fEF.30e.new, by = "GenBank.Accession")
+featMat.30e.new <- convertMissingValues(featMat.30e.new)
+featMat.30e <- rbind(featMat.30e, featMat.30e.new)
+
+# miR-155
 s.rS.fM.155 <- createFeatureMatrix(miR155.5p, accToTarg.155[,1], 
                                    accToTarg.155[,2])
 freeEngFeats.155 <- siteDuplexFreeEnergy(miR155.5p, s.rS.fM.155[[2]],
@@ -72,6 +103,10 @@ freeEngFeats.155 <- siteDuplexFreeEnergy(miR155.5p, s.rS.fM.155[[2]],
 freeEngFeats.155$GenBank.Accession <- names(s.rS.fM.155[[2]])
 featMat.155 <- merge(s.rS.fM.155[[3]], freeEngFeats.155, by = "GenBank.Accession")
 featMat.155 <- convertMissingValues(featMat.155)
+featsList$`miR-155` <- featMat.155
+newFeats155 <- createNewFeatures(featMat.155)
+combFeats155 <- cbind(featMat.155, newFeats155)
+trimFeatsList$`miR-155` <- removeBadFeats(combFeats155)
 
 # new 548d pair feats
 new.548d <- accToTarg.548d[!(accToTarg.548d[,1] %in% featMat.548d$GenBank.Accession), ]

@@ -41,11 +41,11 @@ trimResults.199a <- predictResults(predTrim.199a, trim199aSet)
 
 # Full feature sets with all miRNA:RNA pairs
 featsList <- list(featMat.1289, featMat.155, featMat.199a, featMat.424, 
-                  featMat.4536, featMat.548d, featMatmir23b, 
-                  featMatmir27a, featMatmir3118, featMatmir4307)
+                  featMat.4536, featMat.548d, featMatmir23b, featMat.10a,
+                  featMat.182, featMat.30e)
 names(featsList) <- c("miR-1289", "miR-155", "miR-199a", "miR-424",
                       "miR-4536", "miR-548d", "miR-23b",
-                      "miR-27a", "miR-3118", "miR-4307")
+                      "miR-10a", "miR-182", "miR-30e")
 
 # Trail test and training sets with just 5 pairs for each miRNA
 # and only 5 features
@@ -66,7 +66,11 @@ for(i in 1:length(trimFeatsList)){
 }
 
 cv.10.11 <- executeCV(trimFeatsList, 10) 
-
+# Above CV was done when 584 was still part of the feats list,
+# stricter definition of sufficiently expressed had not been applied,
+# and extra 548d and 1289 data hadn't been added yet
+cv.10.10 <- executeCV(trimFeatsList, 10)
+cv.10.10.balance <- executeCV(trimFeatsList, 10)
 
 
 # Looks like miR-548d pairs just get all classed as non-targets
@@ -164,25 +168,39 @@ rf.155.251
 
 # Train and test an RF sampling from all the data
 set.seed(654)
-train.all <- rbind(train548d, train155)
-test.all <- rbind(test548d, test155)
+train.all <- data.frame()
+test.all <- data.frame()
 for(miName in names(trimFeatsList)){
-  if(!miName %in% c("miR-548d", "miR-155")){
-    trimSet <- trimFeatsList[[miName]]
-    trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
-    trainSet <- trimSet[trainRows,-1]
-    print(table(trainSet$Target))
-    testSet <- trimSet[-trainRows,-1]
-    print(table(testSet$Target))
-    train.all <- rbind(train.all, trainSet)
-    test.all <- rbind(test.all, testSet)
-  }
+  trimSet <- trimFeatsList[[miName]]
+  trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
+  trainSet <- trimSet[trainRows,-1]
+  print(table(trainSet$Target))
+  testSet <- trimSet[-trainRows,-1]
+  print(table(testSet$Target))
+  train.all <- rbind(train.all, trainSet)
+  test.all <- rbind(test.all, testSet)
 }
 
 targCol <- which(colnames(test.all) == "Target")
 all.rf <- randomForest(
   x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
   ytest = test.all$Target, ntree = 251, importance = TRUE)
+predStatistics(all.rf$test)
+varImpPlot(all.rf)
+varImpPlot2(importance(all.rf)[,1:2], xlab = c("Mean Decrease in Specificity", "Mean Decrease in Sensitivity"), 
+            main = "Top 30 Important Features as Measured by Specificity and Sensitivity")
 
+new10a <- createNewFeatures(featMat.10a)
+comb10a <- cbind(featMat.10a, new10a)
+trim10a <- removeBadFeats(comb10a)
 
-
+set.seed(456)
+trainRows <- sample.int(nrow(trim10a), floor((4 * nrow(trim10a))/5))
+train10a <- trim10a[trainRows,-1]
+table(train10a$Target)
+test10a <- trim10a[-trainRows,-1]
+table(test10a$Target)
+set.seed(567)
+rf.10a.251 <- randomForest(x=train10a[,-targCol], y=train10a$Target, 
+                           xtest = test10a[,-targCol], ytest = test10a$Target,
+                           ntree = 251)
