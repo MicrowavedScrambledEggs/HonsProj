@@ -168,15 +168,14 @@ rf.155.251
 
 # Train and test an RF sampling from all the data
 set.seed(654)
+balancedFeatsList <- balanceFeatMat(trimFeatsList, 654)
 train.all <- data.frame()
 test.all <- data.frame()
 for(miName in names(trimFeatsList)){
   trimSet <- trimFeatsList[[miName]]
   trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
   trainSet <- trimSet[trainRows,-1]
-  print(table(trainSet$Target))
   testSet <- trimSet[-trainRows,-1]
-  print(table(testSet$Target))
   train.all <- rbind(train.all, trainSet)
   test.all <- rbind(test.all, testSet)
 }
