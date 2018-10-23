@@ -1,5 +1,6 @@
 library(Biostrings)
 library(seqTools)
+library(seqinr)
 
 all.Mature <- readRNAStringSet("Data/mature.fa/mature.fa", "fasta")
 all.Mature.hsa <- all.Mature[which(grepl("hsa-",names(all.Mature)))]
@@ -17,6 +18,9 @@ legend(legend = colnames(all.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
 miRNA.used <- c(miR10a, miR1289, miR155.5p, miR182, miR23b, miR27a, miR199a3p,
                 miR30e.5p, miR3118, miR424.3p, miR4307, miR4536.5p, miR548d.3p,
                 miR584.5p)
+names(miRNA.used) <- c("miR10a", "miR1289", "miR155.5p", 'miR182', 'miR23b', "miR27a", 'miR199a3p',
+                       'miR30e.5p', 'miR3118', 'miR424.3p', 'miR4307', 'miR4536.5p', 'miR548d.3p',
+                       'miR584.5p')
 miRNA.used <- RNAStringSet(miRNA.used)
 
 miRNA.CV <- c(miR10a,  miR1289, miR155.5p, miR182, miR23b, miR199a3p,
@@ -47,6 +51,17 @@ for(i in 1:10){
           lty = c(1,1,1,1,3,3,3,3))
   legend(legend = colnames(comp.con),"topright",col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3), lwd=2)
 }
+
+# Multiple alignment stuff
+
+seed.seqs <- sapply(miRNA.used, subseq, start = 1, end = 8)
+centered.seqs <- sapply(miRNA.used, subseq, start = 3, end = 15)
+names(seed.seqs) <- paste0(names(miRNA.used), "Seed")
+names(centered.seqs) <- paste0(names(miRNA.used), "Centered")
+to.File <- c(sapply(seed.seqs, as.character), sapply(centered.seqs, as.character))
+to.File <- as.list(to.File)
+names(to.File) <- c(names(seed.seqs), names(centered.seqs))
+write.fasta(to.File, names = names(to.File), file.out = "seedAndCentered.fa")
 
 
 
