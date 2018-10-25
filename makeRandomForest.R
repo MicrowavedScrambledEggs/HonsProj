@@ -171,8 +171,8 @@ set.seed(654)
 balancedFeatsList <- balanceFeatMat(trimFeatsList, 654)
 train.all <- data.frame()
 test.all <- data.frame()
-for(miName in names(trimFeatsList)){
-  trimSet <- trimFeatsList[[miName]]
+for(miName in names(balancedFeatsList)){
+  trimSet <- balancedFeatsList[[miName]]
   trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
   trainSet <- trimSet[trainRows,-1]
   testSet <- trimSet[-trainRows,-1]
@@ -203,3 +203,72 @@ set.seed(567)
 rf.10a.251 <- randomForest(x=train10a[,-targCol], y=train10a$Target, 
                            xtest = test10a[,-targCol], ytest = test10a$Target,
                            ntree = 251)
+
+# Results tables for balanced CV
+getStats <- function(i){
+  meanAcc <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),1])
+  sdAcc <- sd(cv.10.10.balance$resultsMatrix[seq(i,100,10),1])
+  meanSens <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),3])
+  meanSpec <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),6])
+  return(c("Mean Accuracy"=meanAcc, "Std Dev Accuracy"=sdAcc, "Mean Specificity"=meanSpec,
+           "Mean Sensitivity"=meanSens))
+}
+
+# Feature importance
+
+# rbind the tables for each rep for each miRNA for each feature together
+featImpTabs <- sapply(names(featsList), function(miNam) {
+  i <- which(names(featsList) == miNam)
+  featTabLists <- cv.10.10.balance$mdaList[seq(i,100,10)]
+  featImpTab <- sapply(names(featTabLists[[1]]), function(featNam){
+    featTab <- do.call("rbind", lapply(featTabLists, function(x) x[[featNam]]))
+    col.sd <- apply(featTab, 2, sd)
+    col.sd <- col.sd / sqrt(210)
+    return(colMeans(featTab) / col.sd)
+  })
+  return(list(t(featImpTab)))
+})
+
+featImpTabsUnorm <- sapply(names(featsList), function(miNam) {
+  i <- which(names(featsList) == miNam)
+  featTabLists <- cv.10.10.balance$mdaList[seq(i,100,10)]
+  featImpTab <- sapply(names(featTabLists[[1]]), function(featNam){
+    featTab <- do.call("rbind", lapply(featTabLists, function(x) x[[featNam]]))
+    return(colMeans(featTab))
+  })
+  return(list(t(featImpTab)))
+})
+
+featImpTabsSTDER <- sapply(names(featsList), function(miNam) {
+  i <- which(names(featsList) == miNam)
+  featTabLists <- cv.10.10.balance$mdaList[seq(i,100,10)]
+  featImpTab <- sapply(names(featTabLists[[1]]), function(featNam){
+    featTab <- do.call("rbind", lapply(featTabLists, function(x) x[[featNam]]))
+    col.sd <- apply(featTab, 2, sd)
+    col.sd <- col.sd / sqrt(210)
+    return(col.sd)
+  })
+  return(list(t(featImpTab)))
+})
+
+# Table for each miRNA that have a row for each feature and a column each for mda, mdspec, mdsens
+
+# plotting feat importance
+all.imp <- importance(all.rf)
+all.imp <- cbind(all.imp[,3], all.imp[,1:2])
+varImpPlot3(all.imp, featImpTabs, xlab = c("Mean Decrease in Accuracy", "Mean Decrease in Specificity", 
+                                           "Mean Decrease in Sensitivity"))
+
+# Checking that my way of calulating mda is the same as the packages way
+all.rf.wfb <- randomForest(
+  x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
+  ytest = test.all$Target, ntree = 251, importance = TRUE, keep.forest = TRUE, keep.inbag = T)
+
+names(testDAOOB) <- names(all.imp)
+
+featImpTabOOB <- sapply(names(testDAOOB), function(featNam){
+  featTab <- testDAOOB[[featNam]]
+  col.sd <- apply(featTab, 2, sd)
+  col.sd <- col.sd / sqrt((1/3)*1680)
+  return(colMeans(featTab) / col.sd)
+})

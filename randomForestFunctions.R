@@ -1,10 +1,48 @@
-predResultsAllTrees <- function(tree.predictions, testSet){
+predResultsAllTrees <- function(tree.predictions, testSet, inbag=NULL){
   aggregateRes <- predictResults(tree.predictions$aggregate, testSet)
-  treeRes <- apply(tree.predictions$individual, 2, predictResults, 
-                   testSet = testSet)
+  if(is.null(inbag)){
+    treeRes <- apply(tree.predictions$individual, 2, predictResults, 
+                     testSet = testSet)
+  } else {
+    # print("Measuring tree results")
+    treeRes <- sapply(1:ncol(inbag), function(x){
+      predictResultsOOB(tree.predictions$individual[,x], testSet$Target, inbag[,x])
+    } )
+  }
   toReturn <- list(aggregateRes, treeRes)
   names(toReturn) <- c("aggregate", "individual")
   return(toReturn)
+}
+
+predictResultsOOB <- function(prediction, targList, inbag){
+  inbag[inbag > 0] <- 1
+  comb <- cbind(as.numeric(prediction)*0.1, as.numeric(targList)*0.01, inbag)
+  thing <- rowSums(comb)
+  res <- table(thing)
+  noTruePos <- res["0.12"]
+  noTrueNeg <- res["0.01"]
+  noFalsePos <- res["0.11"]
+  noFalseNeg <- res["0.02"]
+  if(is.na(noTruePos)) noTruePos <- 0
+  if(is.na(noTrueNeg)) noTrueNeg <- 0
+  if(is.na(noFalsePos)) noFalsePos <- 0
+  if(is.na(noFalseNeg)) noFalseNeg <- 0
+  testN <- nrow(testSet)
+  testAcuracy <- (noTruePos + noTrueNeg) / testN
+  precision <- noTruePos / (noTruePos + noFalsePos)
+  recall <- noTruePos / (noTruePos + noFalseNeg)
+  fscore <- (2*precision*recall) / (precision + recall)
+  negPrec <- noTrueNeg / (noTrueNeg + noFalseNeg)
+  specificity <- noTrueNeg / (noTrueNeg + noFalsePos)
+  negFScore <- (2*negPrec*specificity) / (negPrec + specificity)
+  results <- c(testAcuracy, precision, recall, fscore, negPrec, specificity, 
+               negFScore, noTrueNeg, noFalseNeg, noTruePos, noFalsePos)
+  results[is.nan(results)] <- 1.0
+  names(results) <- c("Accuracy", "Precision", "Recall", "F-score",
+                      "Negative Precision", "specificity", "Negative F-score",
+                      "# True Negatives", "# False Negatives", 
+                      "# True Positives", "# False Positives")
+  return(results)
 }
 
 predictResults <- function(predictions, testSet){
@@ -141,9 +179,8 @@ measureDA <- function(rf, testSet, predFeats, seed){
   daList <- vector("list", length = length(predFeats))
   names(daList) <- predFeats
   colNo <- 1
-  for(nam in predFeats){
+  daList <- lapply(predFeats, function(nam){
     permTestSet <- testSet
-    set.seed(seed + colNo)
     permTestSet[,nam] <- testSet[shuffle(nrow(testSet)), nam]
     permPred <- predict(rf, permTestSet, predict.all = TRUE)
     resultsTrees <- predResultsAllTrees(permPred, permTestSet)
@@ -152,11 +189,12 @@ measureDA <- function(rf, testSet, predFeats, seed){
     accu <- 1 - rf$test$err.rate
     accuPerm <- t(resultsTrees$individual[c("Accuracy", "specificity", "Recall"), ])
     da <- accu - accuPerm
-    daList[[nam]] <- da
-    colNo <- colNo + 1
-  }
+    return(da)
+  })
   return(daList)
 }
+
+
 
 cvVariableImportance <- function(mdaList, nameTestSet, reps){
   numTestSet <- length(nameTestSet)
@@ -239,4 +277,55 @@ varImpPlot2 <- function (imp, sort = TRUE, n.var = min(30, nrow(imp)),
   invisible(imp)
 }
 
+# Plot mda, mdspec, mdsens for RFall
+#   -  top 30 
+# For the top 30 for RFall, plot the importance values for each miRNA
+
+varImpPlot3 <- function(imp, miImps, sort = TRUE, n.var = min(30, nrow(imp)), 
+                         main = deparse(substitute(imp)), xlab=NULL, ...) 
+{
+  nmeas <- ncol(imp)
+  if (nmeas > 1) {
+    op <- par(mfrow = c(nmeas, 1), mar = c(4, 5, 4, 1), 
+              mgp = c(2, 0.8, 0), oma = c(0, 0, 2, 0), no.readonly = TRUE)
+    on.exit(par(op))
+  }
+  for (i in 1:nmeas) {
+    ord <- if (sort) 
+      rev(order(imp[, i], decreasing = TRUE)[1:n.var])
+    else 1:n.var
+    
+    xmin <- min(imp[ord, i], sapply(miImps, function(miImp) min(miImp[ord, i])))
+    xlab <- if (is.null(xlab)) colnames(imp)
+    else xlab
+    dotchart(imp[ord, i], labels=as.factor(row.names(imp))[ord], xlab = xlab[i], ylab = "", 
+             main = if (nmeas == 1) 
+               main
+             else NULL, xlim = c(xmin, max(imp[, i])), ...)
+    for(j in 1:length(miImps)){
+      points(miImps[[j]][ord, i], as.factor(row.names(imp[ord,])), col = j+1, pch = j)
+    }
+  }
+  if (nmeas > 1) 
+    mtext(outer = TRUE, side = 3, text = main, cex = 1.2)
+  invisible(imp)
+}
+
+measureDAOOB <- function(rf, trainSet, predFeats, seed){
+  daList <- lapply(predFeats, function(nam){
+    permTestSet <- trainSet
+    # print(paste("creating permuted test set for", nam))
+    permTestSet[,nam] <- trainSet[shuffle(nrow(trainSet)), nam]
+    # print(paste("predicting permuted test set for", nam))
+    permPred <- predict(rf, permTestSet, predict.all = TRUE)
+    resultsTrees <- predResultsAllTrees(permPred, permTestSet, rf$inbag)
+    if(!"0" %in% testSet$Target) rf$test$err.rate[,2] <- 1
+    if(!"1" %in% testSet$Target) rf$test$err.rate[,3] <- 1
+    accu <- 1 - rf$err.rate
+    accuPerm <- t(resultsTrees$individual[c("Accuracy", "specificity", "Recall"), ])
+    da <- accu - accuPerm
+    return(da)
+  })
+  return(daList)
+}
 
