@@ -9,4 +9,4 @@
 *.out
 /Data/*
 accSeqRegions.csv
-*.RDataTmp
+*.RDataTmp*

@@ -139,7 +139,7 @@ cvTrainingSet <- function(featsList, trainNo){
 
 # Now the 10 x 11 fold CV
 # Rewritten for memory efficiency
-executeCV <- function(featsList, reps = 10){
+executeCV <- function(featsList, testList=NULL, reps = 10){
   predFeats <- colnames(featsList[[1]])
   predFeats <- predFeats[!predFeats %in% c("Target", "GenBank.Accession")]
   resultsMatrix <- matrix(nrow = reps*length(featsList), ncol = 11)
@@ -153,7 +153,7 @@ executeCV <- function(featsList, reps = 10){
       runNames <- c(runNames, runName)
       cat(runName, "\n")
       trainSetCV <- cvTrainingSet(balancedFeatsList, j)
-      testSetCV <- balancedFeatsList[[j]]
+      testSetCV <- if(is.null(testList)) balancedFeatsList[[j]] else testList[[j]]
       y <- trainSetCV$Target
       x <- trainSetCV[,predFeats]
       xtest <- testSetCV[,predFeats]
@@ -327,5 +327,12 @@ measureDAOOB <- function(rf, trainSet, predFeats, seed){
     return(da)
   })
   return(daList)
+}
+
+getTrimFeatSet <- function(featMat){
+  newFeats <- createNewFeatures(featMat)
+  combFeats <- cbind(featMat, newFeats)
+  trimFeats <- removeBadFeats(combFeats)
+  return(trimFeats)
 }
 

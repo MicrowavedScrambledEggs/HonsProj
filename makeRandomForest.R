@@ -65,12 +65,13 @@ for(i in 1:length(trimFeatsList)){
   trimFeatsList[[i]] <- removeBadFeats(combFeats)
 }
 
-cv.10.11 <- executeCV(trimFeatsList, 10) 
+cv.10.11 <- executeCV(trimFeatsList, reps=10) 
 # Above CV was done when 584 was still part of the feats list,
 # stricter definition of sufficiently expressed had not been applied,
 # and extra 548d and 1289 data hadn't been added yet
-cv.10.10 <- executeCV(trimFeatsList, 10)
-cv.10.10.balance <- executeCV(trimFeatsList, 10)
+cv.10.10 <- executeCV(trimFeatsList, reps=10)
+cv.10.10.balance <- executeCV(trimFeatsList, reps=10)
+cv.10.10.fullTest <- executeCV(trimFeatsList, testList = trimFeatsList, reps = 10)
 
 
 # Looks like miR-548d pairs just get all classed as non-targets
@@ -205,11 +206,11 @@ rf.10a.251 <- randomForest(x=train10a[,-targCol], y=train10a$Target,
                            ntree = 251)
 
 # Results tables for balanced CV
-getStats <- function(i){
-  meanAcc <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),1])
-  sdAcc <- sd(cv.10.10.balance$resultsMatrix[seq(i,100,10),1])
-  meanSens <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),3])
-  meanSpec <- mean(cv.10.10.balance$resultsMatrix[seq(i,100,10),6])
+getStats <- function(i, cvResults){
+  meanAcc <- mean(cvResults$resultsMatrix[seq(i,100,10),1])
+  sdAcc <- sd(cvResults$resultsMatrix[seq(i,100,10),1])
+  meanSens <- mean(cvResults$resultsMatrix[seq(i,100,10),3])
+  meanSpec <- mean(cvResults$resultsMatrix[seq(i,100,10),6])
   return(c("Mean Accuracy"=meanAcc, "Std Dev Accuracy"=sdAcc, "Mean Specificity"=meanSpec,
            "Mean Sensitivity"=meanSens))
 }
@@ -272,3 +273,66 @@ featImpTabOOB <- sapply(names(testDAOOB), function(featNam){
   col.sd <- col.sd / sqrt((1/3)*1680)
   return(colMeans(featTab) / col.sd)
 })
+
+# Data best suited for this feature set:
+
+bestPerf <- list(featMatmir23b, featMatmir27a, featMatmir3118)
+fullBestMat <- do.call("rbind", bestPerf)
+fullBestMatTrim <- getTrimFeatSet(fullBestMat)
+best.size <- nrow(fullBestMatTrim)
+table(fullBestMatTrim$Target)
+best.targs <- which(fullBestMatTrim$Target == 1)
+best.nonTargs <- (1:best.size)[-best.targs]
+set.seed(746)
+train.targs <- sample(best.targs, (5/6)*length(best.targs))
+train.nonTargs <- sample(best.nonTargs, (5/6)*length(best.nonTargs))
+best.train <- fullBestMatTrim[c(train.targs, train.nonTargs),-1]
+best.test <- fullBestMatTrim[-c(train.targs, train.nonTargs),-1]
+
+best.rf <- randomForest(
+  x = best.train[,-targCol], y = best.train$Target, xtest = best.test[,-targCol],
+  ytest = best.test$Target, ntree = 251, importance = TRUE)
+
+# Finding the optimal target vote majority percent
+all.rf.60 <- randomForest(
+  x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
+  ytest = test.all$Target, ntree = 251, cutoff = c(0.4,0.6))
+
+all.rf.55 <- randomForest(
+  x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
+  ytest = test.all$Target, ntree = 251, cutoff = c(0.45,0.55))
+
+train.1289.balanced <- do.call("rbind",balancedFeatsList[-1])
+
+rf.1289.60 <- randomForest(
+  x = train.1289.balanced[,-c(1,targCol+1)], y = train.1289.balanced$Target, xtest = trimFeatsList$`miR-1289`[,-c(1,targCol+1)],
+  ytest = trimFeatsList$`miR-1289`$Target, ntree = 251, cutoff = c(0.4,0.6))
+
+rf.1289 <- randomForest(
+  x = train.1289.balanced[,-c(1,targCol+1)], y = train.1289.balanced$Target, xtest = trimFeatsList$`miR-1289`[,-c(1,targCol+1)],
+  ytest = trimFeatsList$`miR-1289`$Target, ntree = 251)
+
+rf.1289.70 <- randomForest(
+  x = train.1289.balanced[,-c(1,targCol+1)], y = train.1289.balanced$Target, xtest = trimFeatsList$`miR-1289`[,-c(1,targCol+1)],
+  ytest = trimFeatsList$`miR-1289`$Target, ntree = 251, cutoff = c(0.3,0.7))
+
+rf.1289.65 <- randomForest(
+  x = train.1289.balanced[,-c(1,targCol+1)], y = train.1289.balanced$Target, xtest = trimFeatsList$`miR-1289`[,-c(1,targCol+1)],
+  ytest = trimFeatsList$`miR-1289`$Target, ntree = 251, cutoff = c(0.35,0.65))
+
+rf.1289.amb.8 <- randomForest(
+  x = train.1289.balanced[,-c(1,targCol+1)], y = train.1289.balanced$Target, xtest = trimFeatsList$`miR-1289`[,-c(1,targCol+1)],
+  ytest = trimFeatsList$`miR-1289`$Target, ntree = 251, cutoff = c(0.8,0.8))
+
+fullTestStats <- t(sapply(1:10, getStats, cvResults = cv.10.10.fullTest))
+rownames(fullTestStats) <- names(trimFeatsList)
+fullTestStats <- round(fullTestStats, 3)
+ntargsNonTargs <- t(sapply(trimFeatsList, function(x) table(x$Target)))
+fullTestStats <- cbind(fullTestStats, ntargsNonTargs)
+
+fullTestFullAcc <- mean(cv.10.10.fullTest$resultsMatrix[,1])
+fullTestFullSD <- sd(cv.10.10.fullTest$resultsMatrix[,1])
+fullTestFullSens <- mean(cv.10.10.fullTest$resultsMatrix[,3])
+fullTestFullSpec <- mean(cv.10.10.fullTest$resultsMatrix[,6])
+
+
