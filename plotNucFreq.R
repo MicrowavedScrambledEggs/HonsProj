@@ -37,6 +37,19 @@ matplot(cv.Con[1:22,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base 
         main = "Nucleotide frequency at each position for all miRNA used in 10 fold CV")
 legend(legend = colnames(cv.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
 
+avTable <- rbind(colMeans(cv.Con[1:22,]), colMeans(hsa.Con[1:22,]))
+avTable <- rbind(avTable, colMeans(all.Con[1:22,]))
+
+avTable9 <- rbind(colMeans(cv.Con[1:9,]), colMeans(hsa.Con[1:9,]))
+avTable9 <- rbind(avTable9, colMeans(all.Con[1:9,]))
+
+avTable10P <- rbind(colMeans(cv.Con[10:22,]), colMeans(hsa.Con[10:22,]))
+avTable10P <- rbind(avTable10P, colMeans(all.Con[10:22,]))
+
+write.csv(round(avTable, 3), "nucAv.csv")
+write.csv(round(avTable9, 3), "nucAvSeed.csv")
+write.csv(round(avTable10P, 3), "nucAvNotSeed.csv")
+
 # Looks like to get close to the distribution, can not go lower than 40, so as to get the 2.5%
 # differences in frequencies seen accross the positions.
 
