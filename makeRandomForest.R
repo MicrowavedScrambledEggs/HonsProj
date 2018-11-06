@@ -335,4 +335,11 @@ fullTestFullSD <- sd(cv.10.10.fullTest$resultsMatrix[,1])
 fullTestFullSens <- mean(cv.10.10.fullTest$resultsMatrix[,3])
 fullTestFullSpec <- mean(cv.10.10.fullTest$resultsMatrix[,6])
 
+toPlot <- train.all
+toPlot$Target <- as.character(toPlot$Target)
+toPlot$Target[toPlot$Target == "1"] <- "Target"
+toPlot$Target[toPlot$Target == "0"] <- "Non Target"
+boxplot(toPlot$mRNALen~toPlot$Target, ylab = "Length of RNA")
+boxplot(toPlot$c4_3UTRFreq~toPlot$Target, ylab = "Frequency of c4 sites in 3'UTR")
+
 
