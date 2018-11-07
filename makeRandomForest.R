@@ -1,6 +1,7 @@
 library(randomForest)
 library(permute)
 source("randomForestFunctions.R")
+library(vegan)
 
 trainSetRows <- sample.int(nrow(fullFeatMatNoAcc), 
                            round((4/5)*nrow(fullFeatMatNoAcc)))
@@ -64,6 +65,49 @@ for(i in 1:length(trimFeatsList)){
   combFeats <- cbind(trimFeatsList[[i]], newFeats)
   trimFeatsList[[i]] <- removeBadFeats(combFeats)
 }
+
+fullTrimFeatMat <- do.call("rbind", trimFeatsList)
+
+# PCA analysis on the different data sets
+pcaReadyFullFeat <- fullTrimFeatMat
+dupFreeEngCols <- colnames(pcaReadyFullFeat)[
+  grepl("dup", colnames(pcaReadyFullFeat))]
+pcaReadyFullFeat[,dupFreeEngCols] <- t(
+  apply(pcaReadyFullFeat[,dupFreeEngCols], 1, 
+        function(x) {x[x == .Machine$double.xmax] <- 2; return(x)}))
+stopDistCols <- colnames(pcaReadyFullFeat)[
+  grepl("c\\d_stop", colnames(pcaReadyFullFeat))]
+pcaReadyFullFeat[,stopDistCols] <- t(
+  apply(pcaReadyFullFeat[,stopDistCols], 1, 
+        function(x) {x[x == -.Machine$double.xmax] <- - max(pcaReadyFullFeat$mRNALen) - 1; return(x)}))
+pcaReadyFullFeat[,stopDistCols] <- t(
+  apply(pcaReadyFullFeat[,stopDistCols], 1, 
+        function(x) {x[x == .Machine$double.xmax] <- max(pcaReadyFullFeat$mRNALen) + 1; return(x)}))
+pcaAn <- rda(pcaReadyFullFeat[,-c(1,targCol+1)])
+
+biplot(pcaAn, type = 'text')
+# found some weird outliers, though the outliers seem to be on an axis related to 
+# variance. Will convert variance to standard dev then see if they still are outliers
+varCols <- colnames(pcaReadyFullFeat)[
+  grepl("Var", colnames(pcaReadyFullFeat))]
+pcaReadyFullFeat[,varCols] <- t(
+  apply(pcaReadyFullFeat[,varCols], 1, 
+        function(x) {x[x > 0] <- sqrt(x[x > 0]); return(x)}))
+pcaAn <- rda(pcaReadyFullFeat[,-c(1,targCol+1)])
+biplot(pcaAn, type = 'points', display = 'sites')
+miRLabs <- strsplit(rownames(pcaReadyFullFeat), "\\.")
+miRLabs <- sapply(miRLabs, function(x) x[1])
+ordihull(pcaAn, miRLabs, col = 1:10, lty = c(1,1,1,1,1,1,1,1,2,2))
+legend('topright', col = 1:10, lty = c(1,1,1,1,1,1,1,1,2,2), legend = names(featsList))
+ordihull(pcaAn, pcaReadyFullFeat$Target, lty = 3, col = 1:2)
+
+# Vegan is not giving me the option to label by miRNA or class or coding or non coding
+pcaAn2 <- princomp(pcaReadyFullFeat[,-c(1,targCol+1)])
+biplot(pcaAn2, choices = 2:3, xlabs = miRLabs, ylabs = NULL, cex = 0.7)
+
+library(devtools)
+install_github("vqv/ggbiplot")
+library(ggbiplot)
 
 cv.10.11 <- executeCV(trimFeatsList, reps=10) 
 # Above CV was done when 584 was still part of the feats list,
@@ -168,23 +212,85 @@ rf.155.251 <- randomForest(x=train155[,-targCol], y=train155$Target,
 rf.155.251
 
 # Train and test an RF sampling from all the data
-set.seed(654)
-balancedFeatsList <- balanceFeatMat(trimFeatsList, 654)
-train.all <- data.frame()
-test.all <- data.frame()
-for(miName in names(balancedFeatsList)){
-  trimSet <- balancedFeatsList[[miName]]
-  trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
-  trainSet <- trimSet[trainRows,-1]
-  testSet <- trimSet[-trainRows,-1]
-  train.all <- rbind(train.all, trainSet)
-  test.all <- rbind(test.all, testSet)
+importances <- list()
+performances <- data.frame()
+
+for(i in 1:10){
+  set.seed(654 + i)
+  balancedFeatsList <- balanceFeatMat(trimFeatsList, 654 + i)
+  train.all <- data.frame()
+  test.all <- data.frame()
+  for(miName in names(balancedFeatsList)){
+    trimSet <- balancedFeatsList[[miName]]
+    trainRows <- sample.int(nrow(trimSet), floor((4 * nrow(trimSet))/5))
+    trainSet <- trimSet[trainRows,-1]
+    testSet <- trimSet[-trainRows,-1]
+    train.all <- rbind(train.all, trainSet)
+    test.all <- rbind(test.all, testSet)
+  }
+  
+  targCol <- which(colnames(test.all) == "Target")
+  all.rf <- randomForest(
+    x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
+    ytest = test.all$Target, ntree = 251, importance = TRUE)
+  
+  importances[[i]] <- importance(all.rf)
+  performances <- rbind(performances, predStatistics(all.rf$test))
 }
 
-targCol <- which(colnames(test.all) == "Target")
-all.rf <- randomForest(
-  x = train.all[,-targCol], y = train.all$Target, xtest = test.all[,-targCol],
-  ytest = test.all$Target, ntree = 251, importance = TRUE)
+mdaTable <- sapply(importances, function(x) x[,3])
+mdgTable <- sapply(importances, function(x) x[,4])
+mdSpec <- sapply(importances, function(x) x[,1])
+mdSens <- sapply(importances, function(x) x[,2])
+
+avMDA <- rowMeans(mdaTable)
+avMDG <- rowMeans(mdgTable)
+avMDSpec <- rowMeans(mdSpec)
+avMDSens <- rowMeans(mdSens)
+
+par(mfrow = c(2, 2), mar = c(4, 8, 2, 1), cex = 0.7) 
+    # mgp = c(2, 0.8, 0), oma = c(0, 0, 2, 0), no.readonly = TRUE)
+avImpTable <- data.frame(avMDA, avMDG, avMDSpec, avMDSens)
+tableList <- list(mdaTable, mdgTable, mdSpec, mdSens)
+xlabVec <- c("Mean Decrease in Accuracy", "Mean Decrease in Gini Index", 
+             "Mean Decrease in Specificity", "Mean Decrease in Sensitivity")
+for (i in 1:4) {
+  ord <- rev(order(avImpTable[, i], decreasing = TRUE)[1:20])
+  # xlim <- c(min(tableList[[i]][ord,]), max(tableList[[i]][ord,]))
+  boxplot(t(tableList[[i]][ord,]), horizontal = TRUE, las = 2, cex = 0.7,
+          xlab = xlabVec[i])
+}
+
+colnames(performances) <- c("Accuracy", "Precision", "Recall", "F-score",
+                            "Negative Precision", "specificity", "Negative F-score",
+                            "# True Negatives", "# False Negatives", 
+                            "# True Positives", "# False Positives")
+meanAcc <- mean(performances$Accuracy)
+sdAcc <- sd(performances$Accuracy)
+meanSens <- mean(performances$Recall)
+meanSpec <- mean(performances$specificity)
+sdSens <- sd(performances$Recall)
+sdSpec <- sd(performances$specificity)
+meanTP <- mean(performances$`# True Positives`)
+sdTP <- sd(performances$`# True Positives`)
+meanFP <- mean(performances$`# False Positives`)
+sdFP <- sd(performances$`# False Positives`)
+meanTN <- mean(performances$`# True Negatives`)
+sdTN <- sd(performances$`# True Negatives`)
+meanFN <- mean(performances$`# False Negatives`)
+sdFN <- sd(performances$`# False Negatives`)
+
+meanTarg <- mean(apply(performances, 1, function(x) x["# True Positives"] + x["# False Negatives"]))
+meanNonTarg <- mean(apply(performances, 1, function(x) x["# False Positives"] + x["# True Negatives"]))
+meanPredTarg <- mean(apply(performances, 1, function(x) x["# True Positives"] + x["# False Positives"]))
+meanPredNonTarg <- mean(apply(performances, 1, function(x) x["# False Negatives"] + x["# True Negatives"]))
+
+sdTarg <- sd(apply(performances, 1, function(x) x["# True Positives"] + x["# False Negatives"]))
+sdNonTarg <- sd(apply(performances, 1, function(x) x["# False Positives"] + x["# True Negatives"]))
+sdPredTarg <- sd(apply(performances, 1, function(x) x["# True Positives"] + x["# False Positives"]))
+sdPredNonTarg <- sd(apply(performances, 1, function(x) x["# False Negatives"] + x["# True Negatives"]))
+
+
 predStatistics(all.rf$test)
 varImpPlot(all.rf)
 varImpPlot2(importance(all.rf)[,1:2], xlab = c("Mean Decrease in Specificity", "Mean Decrease in Sensitivity"), 
