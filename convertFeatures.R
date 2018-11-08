@@ -50,8 +50,8 @@ convertRow <- function(featRow) {
   return(newFeats)
 }
 
-newTrainFeats <- createNewFeatures(trainingSet)
-newTrainingSet <- cbind(trainingSet, newTrainFeats)
+# newTrainFeats <- createNewFeatures(trainingSet)
+# newTrainingSet <- cbind(trainingSet, newTrainFeats)
 
 # Keep only site identity frequency features for sites 20 to 30 and -5 to 5
 badCols <- c(sapply(
@@ -67,11 +67,11 @@ removeBadFeats <- function(dataSet){
   return(newDataSet)
 }
 
-trimTrainingSet <- removeBadFeats(newTrainingSet)
-newTestFeats <- createNewFeatures(testSet)
-newTestSet <- cbind(testSet, newTestFeats)
-trimTestSet <- removeBadFeats(newTestSet)
-new199aFeats <- createNewFeatures(featMat.199a)
-new199aSet <- cbind(featMat.199a, new199aFeats)
-trim199aSet <- removeBadFeats(new199aSet)
+# trimTrainingSet <- removeBadFeats(newTrainingSet)
+# newTestFeats <- createNewFeatures(testSet)
+# newTestSet <- cbind(testSet, newTestFeats)
+# trimTestSet <- removeBadFeats(newTestSet)
+# new199aFeats <- createNewFeatures(featMat.199a)
+# new199aSet <- cbind(featMat.199a, new199aFeats)
+# trim199aSet <- removeBadFeats(new199aSet)
 

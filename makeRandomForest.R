@@ -1,6 +1,7 @@
 library(randomForest)
 library(permute)
 source("randomForestFunctions.R")
+source("convertFeatures.R")
 library(vegan)
 
 trainSetRows <- sample.int(nrow(fullFeatMatNoAcc), 
@@ -43,10 +44,12 @@ trimResults.199a <- predictResults(predTrim.199a, trim199aSet)
 # Full feature sets with all miRNA:RNA pairs
 featsList <- list(featMat.1289, featMat.155, featMat.199a, featMat.424, 
                   featMat.4536, featMat.548d, featMatmir23b, featMat.10a,
-                  featMat.182, featMat.30e)
+                  featMat.182, featMat.30e, featMatmir27a, featMatmir3118,
+                  featMatmir4307, featMat.584)
 names(featsList) <- c("miR-1289", "miR-155", "miR-199a", "miR-424",
                       "miR-4536", "miR-548d", "miR-23b",
-                      "miR-10a", "miR-182", "miR-30e")
+                      "miR-10a", "miR-182", "miR-30e", "miR-27a", "miR-3118",
+                      "miR-4307", "miR-548")
 
 # Trail test and training sets with just 5 pairs for each miRNA
 # and only 5 features
@@ -70,6 +73,8 @@ fullTrimFeatMat <- do.call("rbind", trimFeatsList)
 
 # PCA analysis on the different data sets
 pcaReadyFullFeat <- fullTrimFeatMat
+# it doesn't like the big values I was using as NA and NAN replacements
+
 dupFreeEngCols <- colnames(pcaReadyFullFeat)[
   grepl("dup", colnames(pcaReadyFullFeat))]
 pcaReadyFullFeat[,dupFreeEngCols] <- t(
@@ -83,32 +88,60 @@ pcaReadyFullFeat[,stopDistCols] <- t(
 pcaReadyFullFeat[,stopDistCols] <- t(
   apply(pcaReadyFullFeat[,stopDistCols], 1, 
         function(x) {x[x == .Machine$double.xmax] <- max(pcaReadyFullFeat$mRNALen) + 1; return(x)}))
-pcaAn <- rda(pcaReadyFullFeat[,-c(1,targCol+1)])
 
-biplot(pcaAn, type = 'text')
-# found some weird outliers, though the outliers seem to be on an axis related to 
-# variance. Will convert variance to standard dev then see if they still are outliers
+# Convert variance to std dev to stop it getting too crazy
 varCols <- colnames(pcaReadyFullFeat)[
   grepl("Var", colnames(pcaReadyFullFeat))]
 pcaReadyFullFeat[,varCols] <- t(
   apply(pcaReadyFullFeat[,varCols], 1, 
         function(x) {x[x > 0] <- sqrt(x[x > 0]); return(x)}))
-pcaAn <- rda(pcaReadyFullFeat[,-c(1,targCol+1)])
-biplot(pcaAn, type = 'points', display = 'sites')
+
+# Get rid of targ and genbank assces
+targCol <- which(colnames(pcaReadyFullFeat) == "Target")
+pcaReadyFullFeat <- pcaReadyFullFeat[,-c(1,targCol)]
+
+# does not like columns where there is no varaince (there were columns with no variance??)
+pcaReadyFullFeat <- pcaReadyFullFeat[,apply(pcaReadyFullFeat, 2, var, na.rm=TRUE) != 0]
+# out of curiosity which ones were they?
+colnames(fullTrimFeatMat)[which(!colnames(fullTrimFeatMat) %in% colnames(pcaReadyFullFeat))]
+
+# miRNA row lables
 miRLabs <- strsplit(rownames(pcaReadyFullFeat), "\\.")
 miRLabs <- sapply(miRLabs, function(x) x[1])
-ordihull(pcaAn, miRLabs, col = 1:10, lty = c(1,1,1,1,1,1,1,1,2,2))
-legend('topright', col = 1:10, lty = c(1,1,1,1,1,1,1,1,2,2), legend = names(featsList))
-ordihull(pcaAn, pcaReadyFullFeat$Target, lty = 3, col = 1:2)
 
-# Vegan is not giving me the option to label by miRNA or class or coding or non coding
-pcaAn2 <- princomp(pcaReadyFullFeat[,-c(1,targCol+1)])
-biplot(pcaAn2, choices = 2:3, xlabs = miRLabs, ylabs = NULL, cex = 0.7)
+pcaAn2 <- prcomp(pcaReadyFullFeat[,-c(1,targCol)], center=T, scale.=T)
 
 library(devtools)
 install_github("vqv/ggbiplot")
 library(ggbiplot)
 
+ggbiplot(pcaAn2, var.axes = F, groups = miRLabs)
+ggbiplot(pcaAn2, var.axes = F, groups = fullTrimFeatMat$Target)
+
+ggbiplot(pcaAn2, choices = c(6,7), var.axes = F, groups = miRLabs)
+ggbiplot(pcaAn2, choices = c(1,4), var.axes = F, groups = fullTrimFeatMat$Target)
+
+pairs(pcaAn2$x[,1:5], upper.panel = NULL, col = fullTrimFeatMat$Target, cex=0.6)
+pairs(pcaAn2$x[,1:5], upper.panel = NULL, col = as.numeric(as.factor(miRLabs)), cex = 0.6)
+
+# Create annotated/non-annotated label
+anotLabel <- rep("Annotated", nrow(fullTrimFeatMat))
+anotLabel[!fullTrimFeatMat$GenBank.Accession %in% accSeqRegions$GenBank.Accession] <- "Not Annotated"
+nonAn <- accSeqRegions$GenBank.Accession[is.na(accSeqRegions$CDS.Start)]
+anotLabel[fullTrimFeatMat$GenBank.Accession %in% nonAn] <- "Not Annotated"
+pairs(pcaAn2$x[,1:5], upper.panel = NULL, col = as.numeric(as.factor(anotLabel)))
+
+# Plot with just one group of target or non target to get a clearer comparision
+par(mfrow=c(1,3))
+plot(pcaAn2$x[,c(1,4)], col = fullTrimFeatMat$Target, cex=0.6, xlim=c(-20,40), ylim=c(-30,20))
+plot(pcaAn2$x[fullTrimFeatMat$Target==0,c(1,4)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-30,20))
+plot(pcaAn2$x[fullTrimFeatMat$Target==1,c(1,4)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-30,20))
+
+plot(pcaAn2$x[,c(1,2)], col = fullTrimFeatMat$Target, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[fullTrimFeatMat$Target==1,c(1,2)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[fullTrimFeatMat$Target==0,c(1,2)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+
+# 10 x 10 fold cross validation
 cv.10.11 <- executeCV(trimFeatsList, reps=10) 
 # Above CV was done when 584 was still part of the feats list,
 # stricter definition of sufficiently expressed had not been applied,
@@ -398,6 +431,83 @@ best.test <- fullBestMatTrim[-c(train.targs, train.nonTargs),-1]
 best.rf <- randomForest(
   x = best.train[,-targCol], y = best.train$Target, xtest = best.test[,-targCol],
   ytest = best.test$Target, ntree = 251, importance = TRUE)
+
+# Look at similarities between these RNA
+targ23b <- featMatmir23b$GenBank.Accession[featMatmir23b$Target==1]
+targ27a <- featMatmir27a$GenBank.Accession[featMatmir27a$Target==1]
+targ3118 <- featMatmir3118$GenBank.Accession[featMatmir3118$Target==1]
+overlap23b27aTarg <- targ23b[targ23b %in% targ27a]
+overlap23b3118Targ <- targ23b[targ23b %in% targ3118]
+overlap3118.27a <- targ3118[targ3118 %in% targ27a]
+overlapAll3 <- overlap23b27aTarg[overlap23b27aTarg %in% targ3118] 
+
+# might want to compare with three other seemingly non related miRNA
+
+# Colour PCA by belonging or not belonging to this group
+bestCol <- rep(3, length(miRLabs))
+bestCol[miRLabs %in% c("miR-27a", "miR-23b", "miR-3118")] <- 4
+pairs(pcaAn2$x[,1:5], upper.panel = NULL, col = bestCol, cex=0.6)
+
+par(mfrow=c(1,3))
+plot(pcaAn2$x[,c(1,2)], col = bestCol, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==3,c(1,2)], col = 3, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==4,c(1,2)], col = 4, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+par(mfrow=c(1,3))
+plot(pcaAn2$x[,c(4,5)], col = bestCol, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==3,c(4,5)], col = 3, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==4,c(4,5)], col = 4, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+
+# Plot only belonging to this group but colour by target and non target
+pairs(pcaAn2$x[bestCol==4,1:5], upper.panel = NULL, col = fullTrimFeatMat$Target[bestCol==4], cex=0.6)
+
+fullTarg <- fullTrimFeatMat$Target
+
+par(mfrow=c(5,3), mar=c(4,4,1,1))
+plot(pcaAn2$x[bestCol==4,c(1,2)], col = fullTarg[bestCol==4], cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 0,c(1,2)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 1,c(1,2)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+
+plot(pcaAn2$x[bestCol==4,c(1,5)], col = fullTarg[bestCol==4], cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 0,c(1,5)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 1,c(1,5)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+
+plot(pcaAn2$x[bestCol==4,c(4,5)], col = fullTarg[bestCol==4], cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 0,c(4,5)], col = 1, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 1,c(4,5)], col = 2, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+
+plot(pcaAn2$x[bestCol==4,c(1,4)], col = fullTarg[bestCol==4], cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 0,c(1,4)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 1,c(1,4)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+
+plot(pcaAn2$x[bestCol==4,c(2,4)], col = fullTarg[bestCol==4], cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 0,c(2,4)], col = 1, cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==4 & fullTarg == 1,c(2,4)], col = 2, cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+
+# compare to rest of miRNA
+
+plot(pcaAn2$x[bestCol==3,c(1,2)], col = fullTarg[bestCol==3], cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 0,c(1,2)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 1,c(1,2)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-10,80))
+
+plot(pcaAn2$x[bestCol==3,c(1,5)], col = fullTarg[bestCol==3], cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 0,c(1,5)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 1,c(1,5)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-80,20))
+
+plot(pcaAn2$x[bestCol==3,c(4,5)], col = fullTarg[bestCol==3], cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 0,c(4,5)], col = 1, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 1,c(4,5)], col = 2, cex=0.6, xlim=c(-25,20), ylim=c(-80,20))
+
+plot(pcaAn2$x[bestCol==3,c(1,4)], col = fullTarg[bestCol==3], cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 0,c(1,4)], col = 1, cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 1,c(1,4)], col = 2, cex=0.6, xlim=c(-20,40), ylim=c(-25,20))
+
+plot(pcaAn2$x[bestCol==3,c(2,4)], col = fullTarg[bestCol==3], cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 0,c(2,4)], col = 1, cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+plot(pcaAn2$x[bestCol==3 & fullTarg == 1,c(2,4)], col = 2, cex=0.6, xlim=c(-10,80), ylim=c(-25,20))
+
+
+
+
 
 # Finding the optimal target vote majority percent
 all.rf.60 <- randomForest(

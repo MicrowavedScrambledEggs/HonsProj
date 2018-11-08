@@ -2,18 +2,35 @@ library(Biostrings)
 library(seqTools)
 library(seqinr)
 
+miR23b <- "AUCACAUUGCCAGGGAUUACC"
+miR27a <- "UUCACAGUGGCUAAGUUCCGC"
+miR3118 <- "UGUGACUGCAUUAUGAAAAUUCU"
+miR4307 <- "AAUGUUUUUUCCUGUUUCC"
+miR199a3p <- "ACAGUAGUCUGCACAUUGGUUA"
+miR424.3p <- "CAAAACGUGAGGCGCUGCUAU"
+miR4536.5p <- "UGUGGUAGAUAUAUGCACGAU"
+miR30e.5p <- "UGUAAACAUCCUUGACUGGAAG"
+miR155.5p <- "UUAAUGCUAAUCGUGAUAGGGGUU"
+miR584.5p <- "UUAUGGUUUGCCUGGGACUGAG"
+miR548d.3p <- "CAAAAACCACAGUUUCUUUUGC"
+miR1289 <- "UGGAGUCCAGGAAUCUGCAUUUU"
+miR10a <- "UACCCUGUAGAUCCGAAUUUGUG"
+miR182 <- "UUUGGCAAUGGUAGAACUCACACU"
+
 all.Mature <- readRNAStringSet("Data/mature.fa/mature.fa", "fasta")
 all.Mature.hsa <- all.Mature[which(grepl("hsa-",names(all.Mature)))]
 
+par(mfrow = c(3,1), mar = c(3,4,2,1))
+
 hsa.Con <- t(consensusMatrix(all.Mature.hsa, baseOnly = TRUE, as.prob = TRUE))
 matplot(hsa.Con[1:25,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
-        main = "Nucleotide frequency at each position for all known human miRNA")
+        ylim = c(0.0, 0.6))
 legend(legend = colnames(hsa.Con)[-5],"top",col=1:4, lty=1:4, lwd=2, horiz = T)
 
 all.Con <- t(consensusMatrix(all.Mature, baseOnly = TRUE, as.prob = TRUE))
 matplot(all.Con[1:25,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
-        main = "Nucleotide frequency at each position for all known miRNA")
-legend(legend = colnames(all.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
+        ylim = c(0.0, 0.6))
+legend(legend = colnames(all.Con)[-5],"top",col=1:4, lty=1:4, lwd=2)
 
 miRNA.used <- c(miR10a, miR1289, miR155.5p, miR182, miR23b, miR27a, miR199a3p,
                 miR30e.5p, miR3118, miR424.3p, miR4307, miR4536.5p, miR548d.3p,
@@ -27,28 +44,32 @@ miRNA.CV <- c(miR10a,  miR1289, miR155.5p, miR182, miR23b, miR199a3p,
               miR30e.5p, miR424.3p, miR4536.5p, miR548d.3p)
 miRNA.CV <- RNAStringSet(miRNA.CV)
 
+cv.Con <- t(consensusMatrix(miRNA.CV, baseOnly = TRUE, as.prob = TRUE))
+matplot(cv.Con[1:22,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
+        xlim = c(1, 25))
+legend(legend = colnames(cv.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
+
 used.Con <- t(consensusMatrix(miRNA.used, baseOnly = TRUE, as.prob = TRUE))
 matplot(used.Con[1:22,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
         main = "Nucleotide frequency at each position for all miRNA used")
 legend(legend = colnames(used.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
 
-cv.Con <- t(consensusMatrix(miRNA.CV, baseOnly = TRUE, as.prob = TRUE))
-matplot(cv.Con[1:22,-5], type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
-        main = "Nucleotide frequency at each position for all miRNA used in 10 fold CV")
-legend(legend = colnames(cv.Con)[-5],"topright",col=1:4, lty=1:4, lwd=2)
-
 avTable <- rbind(colMeans(cv.Con[1:22,]), colMeans(hsa.Con[1:22,]))
 avTable <- rbind(avTable, colMeans(all.Con[1:22,]))
 
-avTable9 <- rbind(colMeans(cv.Con[1:9,]), colMeans(hsa.Con[1:9,]))
-avTable9 <- rbind(avTable9, colMeans(all.Con[1:9,]))
+avTableSeed <- rbind(colMeans(cv.Con[2:8,]), colMeans(hsa.Con[2:8,]))
+avTableSeed <- rbind(avTableSeed, colMeans(all.Con[2:8,]))
 
 avTable10P <- rbind(colMeans(cv.Con[10:22,]), colMeans(hsa.Con[10:22,]))
 avTable10P <- rbind(avTable10P, colMeans(all.Con[10:22,]))
 
+avTable1 <- rbind(cv.Con[1,], hsa.Con[1,])
+avTable1 <- rbind(avTable1, all.Con[1,])
+
 write.csv(round(avTable, 3), "nucAv.csv")
-write.csv(round(avTable9, 3), "nucAvSeed.csv")
+write.csv(round(avTableSeed, 3), "nucAvSeed.csv")
 write.csv(round(avTable10P, 3), "nucAvNotSeed.csv")
+write.csv(round(avTable1, 3), "nucAv1st.csv")
 
 # Looks like to get close to the distribution, can not go lower than 40, so as to get the 2.5%
 # differences in frequencies seen accross the positions.
