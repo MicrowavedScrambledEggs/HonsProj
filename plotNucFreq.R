@@ -74,17 +74,72 @@ write.csv(round(avTable1, 3), "nucAv1st.csv")
 # Looks like to get close to the distribution, can not go lower than 40, so as to get the 2.5%
 # differences in frequencies seen accross the positions.
 
-# sample 10 sets of 40 hsa-miRs and plot their freq distribution agains the human freq dist
-for(i in 1:10){
-  samplmiRNA <- all.Mature.hsa[sample.int(length(all.Mature.hsa),400)]
-  sampl.con <- t(consensusMatrix(samplmiRNA, baseOnly = TRUE, as.prob = TRUE))
-  comp.con <- cbind(hsa.Con[1:22,1:4],sampl.con[1:22,1:4])
-  colnames(comp.con) <- c("A HSA", "C HSA", "G HSA", "U HSA", "A Sample", "C Sample", "G Sample", "U Sample")
-  matplot(comp.con, type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
-          main = "Nucleotide frequency: Full human vs Sample", col = c(1:4,1:4),
-          lty = c(1,1,1,1,3,3,3,3))
-  legend(legend = colnames(comp.con),"top",col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3), lwd=2, horiz = T, cex = 0.5)
+# sample a set of human miRNA, starting at n = 40, measure the difference between the sample dist
+# and whole human nucleotide dist, keep if all diffs are less than 0.025, otherwise discard and
+# resample. Repeat 1000 times or unitil best sample is found. If 1000 repeats do not produce a sample 
+# close to the nuc dist, add 40 to n and start again. Keep going untill n = size of human miRNA set
+n <- 40
+while(n < length(all.Mature.hsa)){
+  for(i in 1:1000){
+    samplmiRNA <- all.Mature.hsa[sample.int(length(all.Mature.hsa),n)]
+    sampl.con <- t(consensusMatrix(samplmiRNA, baseOnly = TRUE, as.prob = TRUE))
+    diffs <- abs(hsa.Con[1:22,1:4] - sampl.con[1:22,1:4])
+    if(!(TRUE %in% (diffs > 0.025))){
+      comp.con <- cbind(hsa.Con[1:22,1:4],sampl.con[1:22,1:4])
+      colnames(comp.con) <- c("A HSA", "C HSA", "G HSA", "U HSA", "A Sample", "C Sample", "G Sample", "U Sample")
+      matplot(comp.con, type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
+              main = "Nucleotide frequency: Full human vs Sample", col = c(1:4,1:4),
+              lty = c(1,1,1,1,3,3,3,3))
+      legend(legend = colnames(comp.con),"top",col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3), lwd=2, horiz = T, cex = 0.5)
+      break
+    }
+  }
+  if(!(TRUE %in% (diffs > 0.025))) break
+  n <- n + 40
 }
+
+samplmiRNA.025 <- samplmiRNA
+
+# Repeat with 0.05 error threshold
+n <- 40
+while(n < length(all.Mature.hsa)){
+  for(i in 1:1000){
+    samplmiRNA <- all.Mature.hsa[sample.int(length(all.Mature.hsa),n)]
+    sampl.con <- t(consensusMatrix(samplmiRNA, baseOnly = TRUE, as.prob = TRUE))
+    diffs <- abs(hsa.Con[1:22,1:4] - sampl.con[1:22,1:4])
+    if(!(TRUE %in% (diffs > 0.05))){
+      comp.con <- cbind(hsa.Con[1:22,1:4],sampl.con[1:22,1:4])
+      colnames(comp.con) <- c("A HSA", "C HSA", "G HSA", "U HSA", "A Sample", "C Sample", "G Sample", "U Sample")
+      matplot(comp.con, type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
+              main = "Nucleotide frequency: Full human vs Sample", col = c(1:4,1:4),
+              lty = c(1,1,1,1,3,3,3,3))
+      legend(legend = colnames(comp.con),"top",col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3), lwd=2, horiz = T, cex = 0.5)
+      break
+    }
+  }
+  if(!(TRUE %in% (diffs > 0.05))) break
+  n <- n + 40
+}
+
+samplmiRNA.05 <- samplmiRNA
+
+par(mfrow=c(2,1), mar=c(4,4,1,1))
+sampl.con <- t(consensusMatrix(samplmiRNA.025, baseOnly = TRUE, as.prob = TRUE))
+comp.con <- cbind(hsa.Con[1:22,1:4],sampl.con[1:22,1:4])
+colnames(comp.con) <- c("A All Human", "C All Human", "G All Human", "U All Human", "A Sample", "C Sample", "G Sample", "U Sample")
+matplot(comp.con, type="l", lwd=2, xlab=NULL, ylab= "Base frequency",
+         col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3))
+legend(legend = colnames(comp.con)[1:4],x=9, y=0.175,col = c(1:4), lty = 1, lwd=2, cex = 0.55)
+legend(legend = colnames(comp.con)[5:8],x=13, y=0.175,col = c(1:4), lty = 3, lwd=2, cex = 0.55)
+
+sampl.con <- t(consensusMatrix(samplmiRNA.05, baseOnly = TRUE, as.prob = TRUE))
+comp.con <- cbind(hsa.Con[1:22,1:4],sampl.con[1:22,1:4])
+colnames(comp.con) <- c("A All Human", "C All Human", "G All Human", "U All Human", "A Sample", "C Sample", "G Sample", "U Sample")
+matplot(comp.con, type="l", lwd=2, xlab="Sequence Position", ylab= "Base frequency",
+        col = c(1:4,1:4), lty = c(1,1,1,1,3,3,3,3))
+legend(legend = colnames(comp.con)[1:4],x=9, y=0.15,col = c(1:4), lty = 1, lwd=2, cex = 0.55)
+legend(legend = colnames(comp.con)[5:8],x=13, y=0.15,col = c(1:4), lty = 3, lwd=2, cex = 0.55)
+
 
 # Multiple alignment stuff
 

@@ -555,7 +555,10 @@ toPlot <- train.all
 toPlot$Target <- as.character(toPlot$Target)
 toPlot$Target[toPlot$Target == "1"] <- "Target"
 toPlot$Target[toPlot$Target == "0"] <- "Non Target"
-boxplot(toPlot$mRNALen~toPlot$Target, ylab = "Length of RNA")
-boxplot(toPlot$c4_3UTRFreq~toPlot$Target, ylab = "Frequency of c4 sites in 3'UTR")
+par(mar=c(5,6,1,1))
+boxplot((toPlot$mRNALen/1000)~toPlot$Target, xlab = "Length of RNA x 1000", horizontal=T, las=2, margin=c(5,5,1,1))
+boxplot((toPlot$c4_end3distMean/1000)~toPlot$Target, xlab = "Mean distance of class 4 sites from 3' end x 1000", 
+        horizontal=T, las=2, margin=c(5,5,1,1))
+
 
 
